@@ -1,0 +1,197 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 取引先マスタ（得意先・仕入先・外注先）
+model Partner {
+  id             Int             @id @default(autoincrement())
+  code           String?         @unique // 取引先コード
+  name           String                  // 取引先名 (日本カラリング株式会社 等)
+  shortName      String?                 // 略称 (JCC 等)
+  department     String?                 // 部署・担当宛先
+  postalCode     String?                 // 郵便番号
+  address        String?                 // 住所
+  tel            String?
+  fax            String?
+  closingDay     String?                 // 締め日 (20日締め 等)
+  paymentTerm    String?                 // 支払期日 (翌月20日払い 等)
+  isCustomer     Boolean         @default(true)
+  isSupplier     Boolean         @default(false)
+  projects       Project[]
+  estimates      Estimate[]
+  invoices       Invoice[]
+  purchaseOrders PurchaseOrder[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+// 社員マスタ
+model Employee {
+  id        Int      @id @default(autoincrement())
+  name      String   // 社員名 (例: 担当者A)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 物件・案件台帳
+model Project {
+  id             Int               @id @default(autoincrement())
+  projectCode    String            @unique // 案件№
+  name           String                    // 物件名/案件内容
+  partnerId      Int
+  partner        Partner           @relation(fields: [partnerId], references: [id])
+  status             String            @default("見積中") // 見積中 / 受注 / 納品済 / 請求済 / 完了
+  leadStaff          String?                   // 担当者 (自社)
+  customerDepartment String?                   // 顧客の担当部署
+  customerStaff      String?                   // 顧客の担当者
+  approximateAmount  Decimal?          @db.Decimal(12, 2) // 概算金額
+  orderedAt          DateTime?
+  clientOrderNo      String?
+  orderAmount        Decimal?          @db.Decimal(12, 2)
+  expectedDeliveryDate DateTime?
+  estimates      Estimate[]
+  orderAccepts   OrderAcceptance[]
+  purchaseOrders PurchaseOrder[]
+  deliveries     Delivery[]
+  invoices       Invoice[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+// 見積書
+model Estimate {
+  id           Int            @id @default(autoincrement())
+  estimateNo   String         @unique // 見積№ (例: 2601736)
+  projectId    Int
+  project      Project        @relation(fields: [projectId], references: [id])
+  partnerId    Int
+  partner      Partner        @relation(fields: [partnerId], references: [id])
+  issueDate    DateTime       // 発行日
+  subtotal     Decimal        @db.Decimal(12, 2)
+  tax          Decimal        @db.Decimal(12, 2)
+  totalAmount  Decimal        @db.Decimal(12, 2)
+  purchaseCost Decimal?       @db.Decimal(12, 2) // 仕入原価
+  grossProfit  Decimal?       @db.Decimal(12, 2) // 粗利
+  validUntil   String?        @default("二ケ月")
+  paymentTerm  String?        @default("別途御相談")
+  items        EstimateItem[]
+  orderAccepts OrderAcceptance[]
+  createdAt    DateTime       @default(now())
+}
+
+model EstimateItem {
+  id         Int      @id @default(autoincrement())
+  estimateId Int
+  estimate   Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  itemOrder  Int      @default(1)
+  itemName   String
+  quantity   Decimal  @db.Decimal(10, 2)
+  unit       String?
+  unitPrice  Decimal  @db.Decimal(12, 2)
+  amount     Decimal  @db.Decimal(12, 2)
+  costPrice  Decimal? @db.Decimal(12, 2)
+}
+
+// 注文請書
+model OrderAcceptance {
+  id           Int       @id @default(autoincrement())
+  acceptanceNo String    @unique // 注文請№
+  projectId    Int
+  project      Project   @relation(fields: [projectId], references: [id])
+  acceptDate   DateTime  // 注文請日
+  deliveryDate DateTime? // 納入日
+  billingDate  DateTime? // 請求予定日
+  totalAmount  Decimal   @db.Decimal(12, 2)
+  staff        String?
+  estimateId   Int?
+  estimate     Estimate? @relation(fields: [estimateId], references: [id])
+  createdAt    DateTime  @default(now())
+}
+
+// 注文書（仕入・外注発注）
+model PurchaseOrder {
+  id           Int       @id @default(autoincrement())
+  orderNo      String    @unique // 注文№
+  projectId    Int
+  project      Project   @relation(fields: [projectId], references: [id])
+  supplierId   Int
+  supplier     Partner   @relation(fields: [supplierId], references: [id])
+  orderDate    DateTime
+  deliveryDate DateTime?
+  paymentDate  DateTime?
+  subtotal     Decimal   @db.Decimal(12, 2)
+  tax          Decimal   @db.Decimal(12, 2)
+  totalAmount  Decimal   @db.Decimal(12, 2)
+  content      String
+  createdAt    DateTime  @default(now())
+}
+
+// 納品書
+model Delivery {
+  id              Int            @id @default(autoincrement())
+  deliveryNo      String         @unique // 納品№
+  projectId       Int
+  project         Project        @relation(fields: [projectId], references: [id])
+  deliveryDate    DateTime       // 納品日
+  expectedPayDate DateTime?      // 入金予定日
+  subtotal        Decimal        @db.Decimal(12, 2)
+  tax             Decimal        @db.Decimal(12, 2)
+  totalAmount     Decimal        @db.Decimal(12, 2)
+  items           DeliveryItem[]
+  createdAt       DateTime       @default(now())
+}
+
+model DeliveryItem {
+  id         Int      @id @default(autoincrement())
+  deliveryId Int
+  delivery   Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  itemName   String
+  quantity   Decimal  @db.Decimal(10, 2)
+  unit       String?
+  unitPrice  Decimal  @db.Decimal(12, 2)
+  amount     Decimal  @db.Decimal(12, 2)
+}
+
+// 請求書・入金台帳
+model Invoice {
+  id            Int           @id @default(autoincrement())
+  invoiceNo     String        @unique // 請求№
+  projectId     Int
+  project       Project       @relation(fields: [projectId], references: [id])
+  partnerId     Int
+  partner       Partner       @relation(fields: [partnerId], references: [id])
+  issueDate     DateTime      // 請求日
+  sendDate      DateTime?     // 請求書発送日
+  subtotal      Decimal       @db.Decimal(12, 2)
+  tax           Decimal       @db.Decimal(12, 2)
+  totalAmount   Decimal       @db.Decimal(12, 2)
+  paidAmount    Decimal       @default(0) @db.Decimal(12, 2) // 入金済額
+  paymentStatus String        @default("未入金") // 未入金 / 一部入金 / 入金済
+  paidDate      DateTime?     // 入金日
+  items         InvoiceItem[]
+  createdAt     DateTime      @default(now())
+}
+
+model InvoiceItem {
+  id        Int     @id @default(autoincrement())
+  invoiceId Int
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  itemName  String
+  quantity  Decimal @db.Decimal(10, 2)
+  unit      String?
+  unitPrice Decimal @db.Decimal(12, 2)
+  amount    Decimal @db.Decimal(12, 2)
+}
+
+// 自動採番連番管理
+model SequenceTracker {
+  key        String   @id // ESTIMATE, DELIVERY, INVOICE, PROJECT
+  yearPrefix String   // 26 等
+  currentSeq Int      @default(0)
+  updatedAt  DateTime @updatedAt
+}

@@ -1,0 +1,7 @@
+常駐起動（PM2 または Windowsサービス）
+サーバ起動時に自動起動するように PM2 などでアプリを立ち上げます。
+
+npm install -g pm2
+pm2 start npm --name "ctej-erp" -- start
+pm2 save
+
