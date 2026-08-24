@@ -260,3 +260,22 @@ model SystemMemo {
 
   @@index([category])
 }
+
+// モック・プロトタイプ カタログ
+model MockPrototype {
+  id           Int      @id @default(autoincrement())
+  title        String
+  description  String
+  category     String   @default("その他")
+  tags         String? // JSON文字列 or カンマ区切り文字列
+  repoUrl      String?
+  composeCmd   String?
+  port         String?
+  defaultCreds String?
+  thumbnailUrl String?
+  version      String?  @default("v1.0.0")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([category])
+}

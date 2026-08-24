@@ -75,7 +75,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </div>
 
-              {/* 6. システム管理 */}
+              {/* 6. 営業・提案ツール */}
+              <div>
+                <h2 className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">営業・提案ツール</h2>
+                <div className="flex flex-col gap-1">
+                  <Link href="/mocks" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-teal-300">モックカタログ</Link>
+                </div>
+              </div>
+
+              {/* 7. システム管理 */}
               <div>
                 <h2 className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">システム管理</h2>
                 <div className="flex flex-col gap-1">
