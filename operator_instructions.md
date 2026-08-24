@@ -1,58 +1,85 @@
-# 案件: 社員現金出納管理、メインメニュー整理、ローカルLLM備忘録チャットの実装
+# C-TERP サーバーシステム監視ダッシュボード機能の実装依頼
 
-## 1. メインメニュー（ナビゲーション）の更新
-サイドバーまたはヘッダーのナビゲーションメニューを以下の5項目で構成してください：
-1. 売掛管理 (`/sales`)
-2. 買掛管理 (`/purchases`)
-3. 現金出納 (`/cash-transactions`)
-4. マスタ管理 (`/masters`)
-5. 社内AI・備忘録 (`/knowledge`)
+C-TERPの管理画面（またはシステム設定画面）内に、ホストサーバー（Windows/Linux共通）の稼働状態、リソース使用率、主要サービス（PostgreSQL、Ollama、Next.js/PM2）のステータスを可視化するダッシュボードウィジェット/ページを実装してください。
 
-## 2. データベース設計 (Prisma)
-`prisma/schema.prisma` に以下の3モデルを追加してください。
-既存のユーザー/社員モデル（`User` 等）および物件モデル（`Project` 等）のモデル名を確認し、リレーションを設定してください。
+---
 
-```prisma
-// 現金出納トランザクション
-model CashTransaction {
-  id              Int      @id @default(autoincrement())
-  transactionDate DateTime
-  type            String   // "OUT"(出金) / "IN"(入金)
-  userId          Int
-  user            User     @relation(fields: [userId], references: [id])
-  projectId       Int?
-  project         Project? @relation(fields: [projectId], references: [id])
-  categoryType    String?  // 高速代, ガソリン代, 電車代, 備品購入 等
-  description     String   // 摘要
-  amount          Int
-  accountSubject  String   @default("旅費交通費")
-  taxCategory     String   @default("仕入10％")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+## 1. 取得・表示する指標（Requirements）
 
-  @@index([transactionDate])
-  @@index([userId])
-  @@index([projectId])
-}
+### ① ホストシステムリソース
+- **CPU使用率 (%)**: リアルタイム/直近値
+- **RAM使用量 / 総容量 / 使用率 (%)**
+- **Node.js プロセスのメモリ消費量**
 
-// 月次残高・繰越管理
-model CashMonthlyBalance {
-  id              Int      @id @default(autoincrement())
-  yearMonth       String   @unique // "YYYY-MM"
-  carryOverAmount Int
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-}
+### ② 各サービスの稼働ステータス (Healthy / Degraded / Down)
+- **PostgreSQL (Database)**: Prismaの接続確認 (`prisma.$queryRaw`SELECT 1) および応答時間(ms)
+- **Ollama (LLM)**: `http://127.0.0.1:11434/api/tags` へのGETリクエスト（稼働状態、モデル一覧、応答時間）
+- **Next.js サーバー状態**: 稼働時間 (Uptime)
 
-// 社内備忘録・システムメモ
-model SystemMemo {
-  id        Int      @id @default(autoincrement())
-  title     String
-  category  String   @default("インフラ")
-  content   String
-  tags      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+---
 
-  @@index([category])
+## 2. 実装方針（Architecture）
+
+### バックエンド: API Route (`/api/system/metrics`)
+Next.js の Route Handler (`src/app/api/system/metrics/route.ts` または `pages/api`) を新規作成してください。
+外部コマンド依存ではなく、Node.js標準の `os` モジュールや内部Fetch/Prismaクライアントを利用してクロスプラットフォーム（Windows/Linux対応）で安全にメトリクスを取得します。
+
+```typescript
+// 例: 実装イメージ
+import { NextResponse } from 'next/server';
+import os from 'os';
+import { prisma } from '@/lib/prisma';
+
+export async function GET() {
+  const startTime = Date.now();
+  
+  // 1. OS & Memory
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const usedMem = totalMem - freeMem;
+  const memoryUsagePercent = ((usedMem / totalMem) * 100).toFixed(1);
+  const cpuLoad = os.loadavg(); // または簡易計算
+
+  // 2. DB Health Check
+  let dbStatus = 'healthy';
+  let dbLatency = 0;
+  try {
+    const dbStart = Date.now();
+    await prisma.$queryRaw`SELECT 1`;
+    dbLatency = Date.now() - dbStart;
+  } catch (err) {
+    dbStatus = 'down';
+  }
+
+  // 3. Ollama Health Check
+  let ollamaStatus = 'healthy';
+  let models: string[] = [];
+  try {
+    const res = await fetch('[http://127.0.0.1:11434/api/tags](http://127.0.0.1:11434/api/tags)', { signal: AbortSignal.timeout(2000) });
+    if (res.ok) {
+      const data = await res.json();
+      models = data.models?.map((m: any) => m.name) || [];
+    } else {
+      ollamaStatus = 'degraded';
+    }
+  } catch (err) {
+    ollamaStatus = 'down';
+  }
+
+  return NextResponse.json({
+    system: {
+      uptime: os.uptime(),
+      platform: os.platform(),
+      totalMemGB: (totalMem / 1024 / 1024 / 1024).toFixed(2),
+      usedMemGB: (usedMem / 1024 / 1024 / 1024).toFixed(2),
+      memoryUsagePercent: Number(memoryUsagePercent),
+      cpuCores: os.cpus().length,
+    },
+    services: {
+      database: { status: dbStatus, latencyMs: dbLatency },
+      ollama: { status: ollamaStatus, models },
+      nextjs: { status: 'healthy', uptimeSeconds: process.uptime() }
+    },
+    timestamp: new Date().toISOString()
+  });
 }

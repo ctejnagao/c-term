@@ -75,6 +75,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </div>
 
+              {/* 6. システム管理 */}
+              <div>
+                <h2 className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">システム管理</h2>
+                <div className="flex flex-col gap-1">
+                  <Link href="/system/monitor" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-blue-300">サーバー監視</Link>
+                </div>
+              </div>
+
             </nav>
           </div>
         </aside>
