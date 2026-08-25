@@ -47,9 +47,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
               {/* 2. 買掛管理 */}
               <div>
-                <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">買掛管理</h2>
+                <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">買掛・外注管理</h2>
                 <div className="flex flex-col gap-1 pl-2">
+                  <Link href="/orders" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-teal-300">受注・分納管理</Link>
                   <Link href="/purchases" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">発注・支払管理</Link>
+                  <Link href="/pdf-imports" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-yellow-300">PDF自動取込</Link>
+                </div>
+              </div>
+
+              {/* 3. 定期契約管理 */}
+              <div>
+                <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">定期契約管理</h2>
+                <div className="flex flex-col gap-1 pl-2">
+                  <Link href="/contracts" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-blue-300">定期契約・一括請求</Link>
                 </div>
               </div>
 
@@ -76,6 +86,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">社内AI・備忘録</h2>
                 <div className="flex flex-col gap-1 pl-2">
                   <Link href="/knowledge" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">社内AI・備忘録</Link>
+                  <Link href="/c-terp-overview.pdf" target="_blank" rel="noopener noreferrer" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-orange-300">システム概要 (PDF)</Link>
                 </div>
               </div>
 

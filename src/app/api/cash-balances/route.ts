@@ -21,7 +21,8 @@ export async function GET(req: Request) {
         yearMonth,
         carryOverAmount: 0,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        deletedAt: null
       };
     }
 

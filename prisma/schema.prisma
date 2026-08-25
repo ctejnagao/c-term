@@ -8,8 +8,8 @@ generator client {
 
 // 取引先マスタ（得意先・仕入先・外注先）
 model Partner {
-  id             Int             @id @default(autoincrement())
-  code           String?         @unique // 取引先コード
+  id             Int                 @id @default(autoincrement())
+  code           String?             @unique // 取引先コード
   name           String // 取引先名 (日本カラリング株式会社 等)
   shortName      String? // 略称 (JCC 等)
   department     String? // 部署・担当宛先
@@ -19,14 +19,18 @@ model Partner {
   fax            String?
   closingDay     String? // 締め日 (20日締め 等)
   paymentTerm    String? // 支払期日 (翌月20日払い 等)
-  isCustomer     Boolean         @default(true)
-  isSupplier     Boolean         @default(false)
+  isCustomer     Boolean             @default(true)
+  isSupplier     Boolean             @default(false)
+  partnerType    String? // "CUSTOMER" | "VENDOR" (新規追加)
   projects       Project[]
   estimates      Estimate[]
   invoices       Invoice[]
   purchaseOrders PurchaseOrder[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  orders         Order[]
+  contracts      RecurringContract[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  deletedAt      DateTime? // 論理削除
 }
 
 // 社員マスタ
@@ -37,6 +41,7 @@ model Employee {
   cashTransactions CashTransaction[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime? // 論理削除
 }
 
 // 物件・案件台帳
@@ -63,6 +68,7 @@ model Project {
   cashTransactions     CashTransaction[]
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
+  deletedAt            DateTime? // 論理削除
 }
 
 // 見積書
@@ -84,19 +90,21 @@ model Estimate {
   items        EstimateItem[]
   orderAccepts OrderAcceptance[]
   createdAt    DateTime          @default(now())
+  deletedAt    DateTime? // 論理削除
 }
 
 model EstimateItem {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   estimateId Int
-  estimate   Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
-  itemOrder  Int      @default(1)
+  estimate   Estimate  @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  itemOrder  Int       @default(1)
   itemName   String
-  quantity   Decimal  @db.Decimal(10, 2)
+  quantity   Decimal   @db.Decimal(10, 2)
   unit       String?
-  unitPrice  Decimal  @db.Decimal(12, 2)
-  amount     Decimal  @db.Decimal(12, 2)
-  costPrice  Decimal? @db.Decimal(12, 2)
+  unitPrice  Decimal   @db.Decimal(12, 2)
+  amount     Decimal   @db.Decimal(12, 2)
+  costPrice  Decimal?  @db.Decimal(12, 2)
+  deletedAt  DateTime? // 論理削除
 }
 
 // 注文請書
@@ -113,6 +121,7 @@ model OrderAcceptance {
   estimateId   Int?
   estimate     Estimate? @relation(fields: [estimateId], references: [id])
   createdAt    DateTime  @default(now())
+  deletedAt    DateTime? // 論理削除
 }
 
 // 注文書（仕入・外注発注）
@@ -131,32 +140,50 @@ model PurchaseOrder {
   totalAmount  Decimal   @db.Decimal(12, 2)
   content      String
   createdAt    DateTime  @default(now())
+  deletedAt    DateTime? // 論理削除
 }
 
-// 納品書
+// 納品書・分納伝票
 model Delivery {
-  id              Int            @id @default(autoincrement())
-  deliveryNo      String         @unique // 納品№
-  projectId       Int
-  project         Project        @relation(fields: [projectId], references: [id])
+  id         Int    @id @default(autoincrement())
+  deliveryNo String @unique // 納品№
+
+  projectId Int? // 既存: Projectとの紐付け
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  orderId Int? // 新規: Orderとの紐付け (分納用)
+  order   Order? @relation(fields: [orderId], references: [id])
+
   deliveryDate    DateTime // 納品日
   expectedPayDate DateTime? // 入金予定日
-  subtotal        Decimal        @db.Decimal(12, 2)
-  tax             Decimal        @db.Decimal(12, 2)
-  totalAmount     Decimal        @db.Decimal(12, 2)
-  items           DeliveryItem[]
-  createdAt       DateTime       @default(now())
+
+  status String? @default("DELIVERED") // SCHEDULED, DELIVERED, CANCELLED
+
+  subtotal    Decimal? @db.Decimal(12, 2) // 新規要件では必須ではないためオプショナルに
+  tax         Decimal? @db.Decimal(12, 2)
+  totalAmount Decimal? @db.Decimal(12, 2)
+
+  items     DeliveryItem[]
+  createdAt DateTime       @default(now())
+  deletedAt DateTime? // 論理削除
 }
 
 model DeliveryItem {
   id         Int      @id @default(autoincrement())
   deliveryId Int
   delivery   Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
-  itemName   String
-  quantity   Decimal  @db.Decimal(10, 2)
-  unit       String?
-  unitPrice  Decimal  @db.Decimal(12, 2)
-  amount     Decimal  @db.Decimal(12, 2)
+
+  itemName  String? // 新規要件では必須ではないためオプショナルに
+  quantity  Decimal  @db.Decimal(10, 2) // 分納時の納品数量
+  unit      String?
+  unitPrice Decimal? @db.Decimal(12, 2)
+  amount    Decimal? @db.Decimal(12, 2)
+
+  orderItemId Int?
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id])
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime? // 論理削除
 }
 
 // 請求書・入金台帳
@@ -177,17 +204,19 @@ model Invoice {
   paidDate      DateTime? // 入金日
   items         InvoiceItem[]
   createdAt     DateTime      @default(now())
+  deletedAt     DateTime? // 論理削除
 }
 
 model InvoiceItem {
-  id        Int     @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   invoiceId Int
-  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice   Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   itemName  String
-  quantity  Decimal @db.Decimal(10, 2)
+  quantity  Decimal   @db.Decimal(10, 2)
   unit      String?
-  unitPrice Decimal @db.Decimal(12, 2)
-  amount    Decimal @db.Decimal(12, 2)
+  unitPrice Decimal   @db.Decimal(12, 2)
+  amount    Decimal   @db.Decimal(12, 2)
+  deletedAt DateTime? // 論理削除
 }
 
 // 自動採番連番管理
@@ -231,8 +260,9 @@ model CashTransaction {
   accountSubject String  @default("旅費交通費") // 勘定科目
   taxCategory    String  @default("仕入10％") // 消費税区分
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // 論理削除
 
   @@index([transactionDate])
   @@index([employeeId])
@@ -241,11 +271,12 @@ model CashTransaction {
 
 // 月次残高・繰越管理
 model CashMonthlyBalance {
-  id              Int      @id @default(autoincrement())
-  yearMonth       String   @unique // "YYYY-MM" (例: "2026-08")
+  id              Int       @id @default(autoincrement())
+  yearMonth       String    @unique // "YYYY-MM" (例: "2026-08")
   carryOverAmount Int // 前月繰越額
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime? // 論理削除
 }
 
 // 社内備忘録・システムメモ
@@ -278,4 +309,100 @@ model MockPrototype {
   updatedAt    DateTime @updatedAt
 
   @@index([category])
+}
+
+// -------------------------------------------------------------
+// 1. 日本カラリング要件（PDF取込・発注・分納管理）
+// -------------------------------------------------------------
+model PdfImport {
+  id         Int       @id @default(autoincrement())
+  fileName   String
+  fileUrl    String
+  rawText    String?   @db.Text
+  parsedData Json? // 抽出した生データ
+  status     String    @default("PENDING") // PENDING, PROCESSED, FAILED
+  createdAt  DateTime  @default(now())
+  deletedAt  DateTime? // Antigravity: 論理削除用
+  orders     Order[]
+}
+
+model Order {
+  id          Int        @id @default(autoincrement())
+  orderNumber String     @unique // 発注番号
+  partnerId   Int
+  partner     Partner    @relation(fields: [partnerId], references: [id])
+  pdfImportId Int?
+  pdfImport   PdfImport? @relation(fields: [pdfImportId], references: [id])
+  totalAmount Decimal    @db.Decimal(12, 2)
+  status      String     @default("OPEN") // OPEN, PARTIALLY_DELIVERED, COMPLETED, CANCELLED
+  orderDate   DateTime
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime? // Antigravity: 論理削除用
+
+  orderItems OrderItem[]
+  deliveries Delivery[]
+}
+
+model OrderItem {
+  id           Int       @id @default(autoincrement())
+  orderId      Int
+  order        Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemName     String
+  quantity     Int // 発注総数量
+  unitPrice    Decimal   @db.Decimal(10, 2)
+  deliveredQty Int       @default(0) // 納品済累計数量
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  deliveryItems DeliveryItem[]
+}
+
+// -------------------------------------------------------------
+// 2. JAトービス要件（定期保守・定額契約・自動請求）
+// -------------------------------------------------------------
+model RecurringContract {
+  id             Int       @id @default(autoincrement())
+  contractNumber String    @unique
+  partnerId      Int
+  partner        Partner   @relation(fields: [partnerId], references: [id])
+  title          String // 例: "JAトービス 月額保守契約"
+  billingCycle   String    @default("MONTHLY") // MONTHLY, YEARLY
+  billingDay     Int       @default(25) // 毎月締日・請求日 (25日など)
+  amount         Decimal   @db.Decimal(12, 2)
+  startDate      DateTime
+  endDate        DateTime?
+  autoRenew      Boolean   @default(true)
+  status         String    @default("ACTIVE") // ACTIVE, PAUSED, TERMINATED
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime? // Antigravity: 論理削除用
+
+  recurringInvoices RecurringInvoice[]
+}
+
+model RecurringInvoice {
+  id           Int               @id @default(autoincrement())
+  contractId   Int
+  contract     RecurringContract @relation(fields: [contractId], references: [id])
+  targetPeriod String // 例: "2026-09"
+  amount       Decimal           @db.Decimal(12, 2)
+  issuedDate   DateTime
+  status       String            @default("ISSUED") // ISSUED, PAID, CANCELLED
+  createdAt    DateTime          @default(now())
+  deletedAt    DateTime?
+}
+
+// -------------------------------------------------------------
+// 3. Antigravity要件（不変監査ログ: 追記のみ許可）
+// -------------------------------------------------------------
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  entityName String // "Order", "Delivery", "RecurringContract" など
+  entityId   Int // IDをIntに変更
+  action     String // "CREATE", "UPDATE", "DELETE", "SPLIT_DELIVERY"
+  diff       Json? // 変更差分
+  userId     String? // 実行ユーザー
+  ipAddress  String?
+  createdAt  DateTime @default(now())
 }

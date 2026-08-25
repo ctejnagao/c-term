@@ -18,7 +18,7 @@ export async function GET() {
     
     const mapped = deliveries.map(d => ({
       ...d,
-      partner: d.project.partner
+      partner: d.project?.partner
     }));
     
     return NextResponse.json(mapped);
