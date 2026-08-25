@@ -51,7 +51,7 @@ export default function PrintPage({ params }: { params: Promise<{ type: string, 
                   : resolvedParams.type === 'invoice' ? data.issueDate : '';
 
   // 画像は後で差し替えられるようにプレースホルダーを配置
-  const logoUrl = '/logo.png'; // 実際には public/logo.png に配置
+  const logoUrl = '/logo_print.png'; // 印刷用（旧）ロゴ
   const sealUrl = '/seal.png'; // 実際には public/seal.png に配置
 
   return (
