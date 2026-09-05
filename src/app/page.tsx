@@ -22,7 +22,13 @@ export default function ProjectsPage() {
   };
 
   useEffect(() => {
-    fetchProjects();
+    // 起動時・画面表示時に計上日超過の入金予定を自動で「入金済」へ同期
+    fetch('/api/system/sync-payment-status')
+      .catch(console.error)
+      .finally(() => {
+        fetchProjects();
+      });
+
     fetch('/api/employees', { cache: 'no-store' })
       .then(res => res.json())
       .then(setEmployees);
@@ -56,7 +62,8 @@ export default function ProjectsPage() {
 
   const sortedProjects = [...filteredProjects].sort((a: any, b: any) => {
     const statusWeight: Record<string, number> = {
-      '入金済': 8,
+      '入金済': 9,
+      '入金予定': 8,
       '完了': 7,
       '請求済': 6,
       '納品済': 5,
@@ -95,6 +102,7 @@ export default function ProjectsPage() {
             <option value="受注">受注</option>
             <option value="納品済">納品済</option>
             <option value="請求済">請求済</option>
+            <option value="入金予定">入金予定</option>
             <option value="入金済">入金済</option>
             <option value="完了">完了</option>
           </select>
@@ -155,7 +163,14 @@ export default function ProjectsPage() {
                   {p.estimates?.[0] ? `¥${Number(p.estimates[0].totalAmount).toLocaleString()}` : '-'}
                 </td>
                 <td className="p-3">
-                  <span className="px-2 py-1 bg-gray-100 rounded text-sm">{p.status}</span>
+                  <span className={`px-2 py-1 rounded text-sm ${
+                    p.status === '入金済' ? 'bg-green-100 text-green-800 font-medium' :
+                    p.status === '入金予定' ? 'bg-blue-100 text-blue-800 font-medium' :
+                    p.status === '請求済' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-gray-100'
+                  }`}>
+                    {p.status}
+                  </span>
                 </td>
                 <td className="p-3">
                   <select 

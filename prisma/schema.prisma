@@ -60,6 +60,7 @@ model Project {
   clientOrderNo        String?
   orderAmount          Decimal?          @db.Decimal(12, 2)
   expectedDeliveryDate DateTime?
+  expectedPayDate      DateTime? // 入金予定日・計上日
   estimates            Estimate[]
   orderAccepts         OrderAcceptance[]
   purchaseOrders       PurchaseOrder[]

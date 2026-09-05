@@ -92,6 +92,8 @@ export async function PUT(request: Request) {
         let newProjectStatus = '請求済';
         if (data.paymentStatus === '入金済') {
           newProjectStatus = '入金済';
+        } else if (data.paymentStatus === '入金予定') {
+          newProjectStatus = '入金予定';
         }
         await tx.project.update({
           where: { id: invoice.projectId },

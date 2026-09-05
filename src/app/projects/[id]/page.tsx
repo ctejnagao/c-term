@@ -126,6 +126,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   <option value="受注">受注</option>
                   <option value="納品済">納品済</option>
                   <option value="請求済">請求済</option>
+                  <option value="入金予定">入金予定</option>
                   <option value="入金済">入金済</option>
                   <option value="完了">完了</option>
                 </select>

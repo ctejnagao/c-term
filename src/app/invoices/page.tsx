@@ -157,6 +157,7 @@ export default function InvoicesPage() {
             <option value="受注">受注</option>
             <option value="納品済">納品済</option>
             <option value="請求済">請求済</option>
+            <option value="入金予定">入金予定</option>
             <option value="入金済">入金済</option>
             <option value="完了">完了</option>
           </select>
@@ -204,6 +205,7 @@ export default function InvoicesPage() {
                 <td className="p-3 text-center">
                   <span className={`px-2 py-1 rounded text-sm ${
                     i.paymentStatus === '入金済' ? 'bg-green-100 text-green-800' :
+                    i.paymentStatus === '入金予定' ? 'bg-blue-100 text-blue-800 font-medium' :
                     i.paymentStatus === '一部入金' ? 'bg-yellow-100 text-yellow-800' :
                     'bg-red-100 text-red-800'
                   }`}>
@@ -218,6 +220,7 @@ export default function InvoicesPage() {
                   >
                     <option value="未入金">未入金</option>
                     <option value="一部入金">一部入金</option>
+                    <option value="入金予定">入金予定</option>
                     <option value="入金済">入金済</option>
                   </select>
                 </td>
