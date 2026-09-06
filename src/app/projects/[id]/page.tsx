@@ -17,6 +17,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     customerStaff: '',
     clientOrderNo: '',
     expectedPayDate: '',
+    approximateAmount: '',
   });
 
   const fetchProject = () => {
@@ -32,6 +33,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           customerStaff: data.customerStaff || '',
           clientOrderNo: data.clientOrderNo || '',
           expectedPayDate: data.expectedPayDate ? data.expectedPayDate.slice(0, 10) : '',
+          approximateAmount: data.approximateAmount !== null && data.approximateAmount !== undefined ? String(data.approximateAmount) : '',
         });
         setLoading(false);
       });
@@ -92,6 +94,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               customerStaff: project.customerStaff || '',
               clientOrderNo: project.clientOrderNo || '',
               expectedPayDate: project.expectedPayDate ? project.expectedPayDate.slice(0, 10) : '',
+              approximateAmount: project.approximateAmount !== null && project.approximateAmount !== undefined ? String(project.approximateAmount) : '',
             })}} className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600">キャンセル</button>
           </div>
         )}
@@ -119,6 +122,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <input type="text" placeholder="例: KB2026000000762" className="border w-full p-1 font-mono" value={editForm.clientOrderNo} onChange={e => setEditForm({...editForm, clientOrderNo: e.target.value})} />
             ) : (
               <p className="font-mono">{project.clientOrderNo || '未登録'}</p>
+            )}
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">物件金額 (概算金額)</p>
+            {isEditing ? (
+              <input 
+                type="number" 
+                placeholder="例: 1000000" 
+                className="border w-full p-1 font-mono" 
+                value={editForm.approximateAmount} 
+                onChange={e => setEditForm({...editForm, approximateAmount: e.target.value})} 
+              />
+            ) : (
+              <p className="font-mono font-bold text-gray-800">
+                {project.approximateAmount ? `¥${Number(project.approximateAmount).toLocaleString()}` : '未設定'}
+              </p>
             )}
           </div>
           <div>
@@ -194,7 +213,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       <div>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">関連見積</h2>
-          <Link href="/estimates/new" className="text-sm bg-blue-600 text-white px-3 py-1 rounded">新規見積作成</Link>
+          <Link href={`/estimates/new?projectId=${project.id}`} className="text-sm bg-blue-600 text-white px-3 py-1 rounded">新規見積作成</Link>
         </div>
         <div className="bg-white rounded shadow overflow-hidden">
           <table className="w-full text-left border-collapse text-sm">

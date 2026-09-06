@@ -41,6 +41,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           customerDepartment: data.customerDepartment !== undefined ? data.customerDepartment : undefined,
           customerStaff: data.customerStaff !== undefined ? data.customerStaff : undefined,
           clientOrderNo: data.clientOrderNo !== undefined ? data.clientOrderNo : undefined,
+          approximateAmount: data.approximateAmount !== undefined ? (data.approximateAmount ? Number(data.approximateAmount) : null) : undefined,
           ...(expectedPayDate !== undefined ? { expectedPayDate } : {}),
         }
       });

@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function NewEstimatePage() {
+function NewEstimateContent() {
   const router = useRouter();
-  const [projects, setProjects] = useState([]);
-  const [partners, setPartners] = useState([]);
+  const searchParams = useSearchParams();
+  const queryProjectId = searchParams.get('projectId') || '';
+
+  const [projects, setProjects] = useState<any[]>([]);
+  const [partners, setPartners] = useState<any[]>([]);
   const [formData, setFormData] = useState({
-    projectId: '',
+    projectId: queryProjectId,
     partnerId: '',
     issueDate: new Date().toISOString().split('T')[0],
     validUntil: '二ケ月',
@@ -19,10 +22,42 @@ export default function NewEstimatePage() {
     { itemName: '', quantity: 1, unit: '式', unitPrice: 0, costPrice: 0 }
   ]);
 
+  const handleProjectSelect = (pid: string, projectList = projects) => {
+    const proj = projectList.find((p: any) => String(p.id) === String(pid));
+    setFormData(prev => ({
+      ...prev,
+      projectId: pid,
+      partnerId: proj ? String(proj.partnerId) : '',
+    }));
+
+    if (proj) {
+      const defaultAmount = Number(proj.approximateAmount || proj.orderAmount || 0);
+      setItems(prevItems => {
+        if (prevItems.length === 0) {
+          return [{ itemName: proj.name || '', quantity: 1, unit: '式', unitPrice: defaultAmount, costPrice: 0 }];
+        }
+        const newItems = [...prevItems];
+        newItems[0] = {
+          ...newItems[0],
+          itemName: proj.name || '',
+          unitPrice: defaultAmount,
+        };
+        return newItems;
+      });
+    }
+  };
+
   useEffect(() => {
-    fetch('/api/projects').then(res => res.json()).then(setProjects);
+    fetch('/api/projects')
+      .then(res => res.json())
+      .then(data => {
+        setProjects(data);
+        if (queryProjectId) {
+          handleProjectSelect(queryProjectId, data);
+        }
+      });
     fetch('/api/partners').then(res => res.json()).then(setPartners);
-  }, []);
+  }, [queryProjectId]);
 
   const handleAddItem = () => {
     setItems([...items, { itemName: '', quantity: 1, unit: '式', unitPrice: 0, costPrice: 0 }]);
@@ -81,11 +116,7 @@ export default function NewEstimatePage() {
               <select 
                 className="w-full border p-2 rounded" 
                 value={formData.projectId}
-                onChange={e => {
-                  const pid = e.target.value;
-                  const proj = projects.find((p: any) => p.id === Number(pid)) as any;
-                  setFormData({...formData, projectId: pid, partnerId: proj ? String(proj.partnerId) : ''});
-                }}
+                onChange={e => handleProjectSelect(e.target.value)}
                 required
               >
                 <option value="">選択してください</option>
@@ -215,5 +246,13 @@ export default function NewEstimatePage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function NewEstimatePage() {
+  return (
+    <Suspense fallback={<div className="p-8 max-w-5xl mx-auto">読み込み中...</div>}>
+      <NewEstimateContent />
+    </Suspense>
   );
 }
