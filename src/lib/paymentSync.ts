@@ -112,6 +112,27 @@ export async function syncPaymentStatuses(): Promise<{
         });
       }
 
+      // 3. 見積（Estimate）が存在するが、ステータスが「案件」のままの Project を「見積中」に更新
+      const pendingEstimateProjects = await tx.project.findMany({
+        where: {
+          status: "案件",
+          deletedAt: null,
+          estimates: {
+            some: {
+              deletedAt: null,
+            },
+          },
+        },
+      });
+
+      for (const p of pendingEstimateProjects) {
+        await tx.project.update({
+          where: { id: p.id },
+          data: { status: "見積中" },
+        });
+        updatedProjectsCount++;
+      }
+
       return {
         updatedProjectsCount,
         updatedInvoicesCount,

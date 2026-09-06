@@ -99,6 +99,17 @@ export async function PUT(
         });
       }
 
+      // 案件のステータスが「案件」の場合は「見積中」に自動更新
+      const project = await tx.project.findUnique({
+        where: { id: Number(data.projectId) }
+      });
+      if (project && project.status === '案件') {
+        await tx.project.update({
+          where: { id: Number(data.projectId) },
+          data: { status: '見積中' }
+        });
+      }
+
       return await tx.estimate.update({
         where: { id },
         data: {

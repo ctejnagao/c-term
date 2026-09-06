@@ -51,28 +51,43 @@ export async function POST(request: Request) {
     const totalAmount = subtotal + tax;
     const grossProfit = subtotal - purchaseCost;
 
-    const estimate = await prisma.estimate.create({
-      data: {
-        estimateNo,
-        projectId: Number(data.projectId),
-        partnerId: Number(data.partnerId),
-        issueDate: new Date(data.issueDate),
-        subtotal,
-        tax,
-        totalAmount,
-        purchaseCost,
-        grossProfit,
-        validUntil: data.validUntil || '二ケ月',
-        paymentTerm: data.paymentTerm || '別途御相談',
-        items: {
-          create: items
+    const estimate = await prisma.$transaction(async (tx) => {
+      const created = await tx.estimate.create({
+        data: {
+          estimateNo,
+          projectId: Number(data.projectId),
+          partnerId: Number(data.partnerId),
+          issueDate: new Date(data.issueDate),
+          subtotal,
+          tax,
+          totalAmount,
+          purchaseCost,
+          grossProfit,
+          validUntil: data.validUntil || '二ケ月',
+          paymentTerm: data.paymentTerm || '別途御相談',
+          items: {
+            create: items
+          }
+        },
+        include: {
+          items: true,
+          project: true,
+          partner: true,
         }
-      },
-      include: {
-        items: true,
-        project: true,
-        partner: true,
+      });
+
+      // 案件のステータスが「案件」の場合は「見積中」に自動更新
+      const project = await tx.project.findUnique({
+        where: { id: Number(data.projectId) }
+      });
+      if (project && project.status === '案件') {
+        await tx.project.update({
+          where: { id: Number(data.projectId) },
+          data: { status: '見積中' }
+        });
       }
+
+      return created;
     });
     return NextResponse.json(estimate, { status: 201 });
   } catch (error) {
