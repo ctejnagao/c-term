@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, FileWarning, ExternalLink } from "lucide-react";
 import { resolvePdfFilePath } from "@/lib/pdfStorage";
+import { calculateExpectedPayDate, adjustToPreviousBusinessDay, formatToYmd } from "@/lib/dateUtils";
 
 export default async function PdfImportDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
@@ -40,6 +41,16 @@ export default async function PdfImportDetailPage({ params }: { params: Promise<
     }
   }
 
+  // 入金予定日の算出（支払明細書の場合、計上日の翌月末。土日の場合は手前の平日に調整）
+  let expectedPayDate: string | null = null;
+  if (parsedData?.type === 'PAYMENT_STATEMENT' || (documentNumber && String(documentNumber).startsWith('SH'))) {
+    if (parsedData?.paymentDate) {
+      expectedPayDate = formatToYmd(adjustToPreviousBusinessDay(new Date(parsedData.paymentDate)));
+    } else if (parsedData?.date) {
+      expectedPayDate = formatToYmd(calculateExpectedPayDate(parsedData.date));
+    }
+  }
+
   return (
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
@@ -67,7 +78,9 @@ export default async function PdfImportDetailPage({ params }: { params: Promise<
                     <span className="text-base font-bold text-blue-900">{estimateNo}</span>
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-indigo-700 block">購買No (発注No)</span>
+                    <span className="text-xs font-bold text-indigo-700 block">
+                      {parsedData.type === 'PAYMENT_STATEMENT' ? '支払No' : '購買No (発注No)'}
+                    </span>
                     <span className="text-base font-bold text-indigo-900">{documentNumber}</span>
                   </div>
                   <div>
@@ -85,7 +98,7 @@ export default async function PdfImportDetailPage({ params }: { params: Promise<
                 </div>
 
                 <div className="flex border-b pb-2 pt-2 text-sm">
-                  <span className="w-32 font-bold text-gray-600">種類</span>
+                  <span className="w-32 font-bold text-gray-600">書類種別</span>
                   <span className="font-medium text-gray-800">{parsedData.type || "-"}</span>
                 </div>
                 <div className="flex border-b pb-2 text-sm">
@@ -96,9 +109,15 @@ export default async function PdfImportDetailPage({ params }: { params: Promise<
                   </span>
                 </div>
                 <div className="flex border-b pb-2 text-sm">
-                  <span className="w-32 font-bold text-gray-600">日付</span>
+                  <span className="w-32 font-bold text-gray-600">計上日 / 発注日</span>
                   <span className="font-medium text-gray-800">{parsedData.date || "-"}</span>
                 </div>
+                {expectedPayDate && (
+                  <div className="flex border-b pb-2 text-sm bg-amber-50/60 p-2 rounded">
+                    <span className="w-32 font-bold text-amber-900">入金予定日</span>
+                    <span className="font-bold text-amber-950">{expectedPayDate}（計上日の翌月末）</span>
+                  </div>
+                )}
                 {parsedData.deliveryDate && (
                   <div className="flex border-b pb-2 text-sm">
                     <span className="w-32 font-bold text-gray-600">希望納期</span>
@@ -109,15 +128,27 @@ export default async function PdfImportDetailPage({ params }: { params: Promise<
                 {/* 明細（商品名一覧） */}
                 {items && items.length > 0 ? (
                   <div className="mt-4 pt-2">
-                    <h3 className="font-bold text-sm text-gray-700 mb-2">商品明細</h3>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-bold text-sm text-gray-700">商品明細（全 {items.length} 件）</h3>
+                    </div>
                     <div className="overflow-x-auto border rounded">
                       <table className="w-full text-xs text-left">
                         <thead className="bg-gray-50 border-b text-gray-600">
                           <tr>
+                            <th className="p-2">#</th>
+                            {items.some((i: any) => i.orderNumber) && (
+                              <th className="p-2">購買NO</th>
+                            )}
+                            {items.some((i: any) => i.acceptanceDate) && (
+                              <th className="p-2">検収日</th>
+                            )}
                             <th className="p-2">商品名（品名）</th>
                             <th className="p-2 text-right">数量</th>
                             <th className="p-2 text-right">単価</th>
-                            <th className="p-2 text-right">税抜金額</th>
+                            {items.some((i: any) => i.discountAmount) && (
+                              <th className="p-2 text-right">値引</th>
+                            )}
+                            <th className="p-2 text-right">金額合計</th>
                             {items.some((i: any) => i.estimateNo) && (
                               <th className="p-2 text-center">見積No</th>
                             )}
@@ -126,9 +157,25 @@ export default async function PdfImportDetailPage({ params }: { params: Promise<
                         <tbody className="divide-y">
                           {items.map((item: any, i: number) => (
                             <tr key={i} className="hover:bg-gray-50">
+                              <td className="p-2 text-gray-400">{i + 1}</td>
+                              {items.some((it: any) => it.orderNumber) && (
+                                <td className="p-2 font-mono font-medium text-blue-700 whitespace-nowrap">
+                                  {item.orderNumber || "-"}
+                                </td>
+                              )}
+                              {items.some((it: any) => it.acceptanceDate) && (
+                                <td className="p-2 text-gray-600 whitespace-nowrap">
+                                  {item.acceptanceDate || "-"}
+                                </td>
+                              )}
                               <td className="p-2 font-medium text-gray-800">{item.itemName || "-"}</td>
                               <td className="p-2 text-right text-gray-600 whitespace-nowrap">{item.quantity} {item.unit}</td>
                               <td className="p-2 text-right text-gray-600 whitespace-nowrap">{item.unitPrice ? `¥${Number(item.unitPrice).toLocaleString()}` : "-"}</td>
+                              {items.some((it: any) => it.discountAmount) && (
+                                <td className="p-2 text-right text-red-600 whitespace-nowrap">
+                                  {item.discountAmount ? `¥${Number(item.discountAmount).toLocaleString()}` : "-"}
+                                </td>
+                              )}
                               <td className="p-2 text-right font-medium text-emerald-800 whitespace-nowrap">{item.amount ? `¥${Number(item.amount).toLocaleString()}` : "-"}</td>
                               {items.some((it: any) => it.estimateNo) && (
                                 <td className="p-2 text-center text-blue-700 whitespace-nowrap">{item.estimateNo || "-"}</td>

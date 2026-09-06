@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { UploadCloud, FileText, CheckCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import { calculateExpectedPayDate, adjustToPreviousBusinessDay, formatToYmd } from "@/lib/dateUtils";
 
 export default function PdfImportsPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -86,6 +87,16 @@ export default function PdfImportsPage() {
       }
     }
 
+    // 入金予定日の算出（支払明細書の場合、計上日の翌月末。土日なら手前の平日に調整）
+    let expectedPayDate: string | null = null;
+    if (parsedData.type === 'PAYMENT_STATEMENT' || (parsedData.documentNumber && String(parsedData.documentNumber).startsWith('SH'))) {
+      if (parsedData.paymentDate) {
+        expectedPayDate = formatToYmd(adjustToPreviousBusinessDay(new Date(parsedData.paymentDate)));
+      } else if (parsedData.date) {
+        expectedPayDate = formatToYmd(calculateExpectedPayDate(parsedData.date));
+      }
+    }
+
     return {
       estimateNo,
       documentNumber,
@@ -94,6 +105,8 @@ export default function PdfImportsPage() {
       totalAmount: parsedData.totalAmount ? Number(parsedData.totalAmount) : null,
       partnerName: parsedData.partnerName || parsedData.issuerName || "-",
       type: parsedData.type,
+      date: parsedData.date,
+      expectedPayDate,
       items,
     };
   };
@@ -180,9 +193,11 @@ export default function PdfImportsPage() {
                       </div>
                     </div>
 
-                    {/* 購買No */}
+                    {/* 購買No / 支払No */}
                     <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
-                      <div className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-1">購買No (発注No)</div>
+                      <div className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-1">
+                        {currentParsedInfo.type === 'PAYMENT_STATEMENT' ? '支払No' : '購買No (発注No)'}
+                      </div>
                       <div className="text-lg font-bold text-indigo-900 truncate">
                         {currentParsedInfo.documentNumber}
                       </div>
@@ -203,34 +218,89 @@ export default function PdfImportsPage() {
                       )}
                     </div>
 
-                    {/* 書類種別 / 取引先 */}
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                      <div className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">取引先 / 書類種別</div>
-                      <div className="text-sm font-bold text-gray-800 truncate" title={currentParsedInfo.partnerName}>
-                        {currentParsedInfo.partnerName}
+                    {/* 入金予定日 / 書類日付 */}
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <div className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-1">
+                        {currentParsedInfo.expectedPayDate ? '入金予定日（翌月末）' : '書類日付'}
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        種別: {currentParsedInfo.type || "不明"}
+                      <div className="text-base font-bold text-amber-900 truncate">
+                        {currentParsedInfo.expectedPayDate || currentParsedInfo.date || "-"}
                       </div>
+                      {currentParsedInfo.date && currentParsedInfo.expectedPayDate && (
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          計上日: {currentParsedInfo.date}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* 商品名 */}
+                  {/* 明細行一覧（複数行対応） */}
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <div className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">商品名（明細品名）</div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                        明細行一覧（全 {currentParsedInfo.items.length} 件）
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        取引先: {currentParsedInfo.partnerName}
+                      </div>
+                    </div>
+
                     {currentParsedInfo.items.length > 0 ? (
-                      <div className="space-y-1.5">
-                        {currentParsedInfo.items.map((item: any, idx: number) => (
-                          <div key={idx} className="flex items-center justify-between text-sm bg-white p-2 rounded border border-gray-100">
-                            <span className="font-medium text-gray-800">
-                              {idx + 1}. {item.itemName || "名称未設定"}
-                            </span>
-                            <span className="text-gray-600 text-xs">
-                              {item.quantity ? `${item.quantity}${item.unit || ""}` : ""} 
-                              {item.amount ? ` (¥${Number(item.amount).toLocaleString()})` : ""}
-                            </span>
-                          </div>
-                        ))}
+                      <div className="overflow-x-auto border rounded bg-white">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-gray-100 border-b text-gray-700">
+                            <tr>
+                              <th className="p-2">#</th>
+                              {currentParsedInfo.items.some((i: any) => i.orderNumber) && (
+                                <th className="p-2">購買NO</th>
+                              )}
+                              {currentParsedInfo.items.some((i: any) => i.acceptanceDate) && (
+                                <th className="p-2">検収日</th>
+                              )}
+                              <th className="p-2">商品名（品名）</th>
+                              <th className="p-2 text-right">数量</th>
+                              <th className="p-2 text-right">単価</th>
+                              {currentParsedInfo.items.some((i: any) => i.discountAmount) && (
+                                <th className="p-2 text-right">値引金額</th>
+                              )}
+                              <th className="p-2 text-right">金額合計</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {currentParsedInfo.items.map((item: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-blue-50/40">
+                                <td className="p-2 text-gray-400">{idx + 1}</td>
+                                {currentParsedInfo.items.some((i: any) => i.orderNumber) && (
+                                  <td className="p-2 font-mono font-medium text-blue-700 whitespace-nowrap">
+                                    {item.orderNumber || "-"}
+                                  </td>
+                                )}
+                                {currentParsedInfo.items.some((i: any) => i.acceptanceDate) && (
+                                  <td className="p-2 text-gray-600 whitespace-nowrap">
+                                    {item.acceptanceDate || "-"}
+                                  </td>
+                                )}
+                                <td className="p-2 font-medium text-gray-800">
+                                  {item.itemName || "名称未設定"}
+                                </td>
+                                <td className="p-2 text-right text-gray-600 whitespace-nowrap">
+                                  {item.quantity ? `${item.quantity}${item.unit || ""}` : "-"}
+                                </td>
+                                <td className="p-2 text-right text-gray-600 whitespace-nowrap">
+                                  {item.unitPrice ? `¥${Number(item.unitPrice).toLocaleString()}` : "-"}
+                                </td>
+                                {currentParsedInfo.items.some((i: any) => i.discountAmount) && (
+                                  <td className="p-2 text-right text-red-600 whitespace-nowrap">
+                                    {item.discountAmount ? `¥${Number(item.discountAmount).toLocaleString()}` : "¥0"}
+                                  </td>
+                                )}
+                                <td className="p-2 text-right font-bold text-emerald-800 whitespace-nowrap">
+                                  {item.amount ? `¥${Number(item.amount).toLocaleString()}` : "-"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     ) : (
                       <div className="text-sm text-gray-700 font-medium">
@@ -248,6 +318,25 @@ export default function PdfImportsPage() {
                       <Link href={`/orders/${result.createdOrder.id}`} className="font-bold underline ml-2">
                         発注書を開く
                       </Link>
+                    </div>
+                  )}
+                  {result.paymentResults && result.paymentResults.length > 0 && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-950 space-y-1">
+                      <div className="font-bold text-emerald-900">
+                        支払明細データに基づき案件ステータスを入金予定/入金済に更新しました（全 {result.paymentResults.length} 明細）：
+                      </div>
+                      <div className="space-y-1 mt-1 text-xs">
+                        {result.paymentResults.map((pr: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between bg-white p-1.5 rounded border border-emerald-100">
+                            <span>
+                              {pr.item?.orderNumber || `明細${i+1}`}: {pr.item?.itemName}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded font-semibold ${pr.status === '入金済' ? 'bg-green-100 text-green-800' : pr.status === '入金予定' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>
+                              {pr.status === '入金済' ? '入金済' : pr.status === '入金予定' ? `入金予定 (${pr.expectedPayDate})` : '未紐付'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                   {result.matchedEstimate && (
