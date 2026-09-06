@@ -14,7 +14,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     status: '',
     leadStaff: '',
     customerDepartment: '',
-    customerStaff: ''
+    customerStaff: '',
+    clientOrderNo: '',
+    expectedPayDate: '',
   });
 
   const fetchProject = () => {
@@ -27,7 +29,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           status: data.status,
           leadStaff: data.leadStaff || '',
           customerDepartment: data.customerDepartment || '',
-          customerStaff: data.customerStaff || ''
+          customerStaff: data.customerStaff || '',
+          clientOrderNo: data.clientOrderNo || '',
+          expectedPayDate: data.expectedPayDate ? data.expectedPayDate.slice(0, 10) : '',
         });
         setLoading(false);
       });
@@ -75,13 +79,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
       <div className="bg-white p-6 rounded shadow relative">
         {!isEditing ? (
-          <button onClick={() => setIsEditing(true)} className="absolute top-4 right-4 text-blue-600 hover:underline text-sm">編集</button>
+          <button onClick={() => setIsEditing(true)} className="absolute top-4 right-4 text-blue-600 hover:underline text-sm font-bold">編集</button>
         ) : (
           <div className="absolute top-4 right-4 flex gap-2">
             <button onClick={handleDelete} className="bg-red-600 text-white px-3 py-1 rounded text-sm mr-2 hover:bg-red-700">削除</button>
-            <button onClick={handleUpdate} className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">保存</button>
+            <button onClick={handleUpdate} className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 font-bold">保存</button>
             <button onClick={() => { setIsEditing(false); setEditForm({
-              name: project.name, status: project.status, leadStaff: project.leadStaff || '', customerDepartment: project.customerDepartment || '', customerStaff: project.customerStaff || ''
+              name: project.name,
+              status: project.status,
+              leadStaff: project.leadStaff || '',
+              customerDepartment: project.customerDepartment || '',
+              customerStaff: project.customerStaff || '',
+              clientOrderNo: project.clientOrderNo || '',
+              expectedPayDate: project.expectedPayDate ? project.expectedPayDate.slice(0, 10) : '',
             })}} className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600">キャンセル</button>
           </div>
         )}
@@ -89,7 +99,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         <div className="grid grid-cols-2 gap-y-4 gap-x-8 mt-4">
           <div>
             <p className="text-sm text-gray-500">案件№</p>
-            <p className="font-bold text-lg">{project.projectCode}</p>
+            <p className="font-bold text-lg font-mono">{project.projectCode}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">案件名/件名</p>
@@ -102,6 +112,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <div>
             <p className="text-sm text-gray-500">取引先</p>
             <p>{project.partner?.name}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">購買NO (顧客発注番号)</p>
+            {isEditing ? (
+              <input type="text" placeholder="例: KB2026000000762" className="border w-full p-1 font-mono" value={editForm.clientOrderNo} onChange={e => setEditForm({...editForm, clientOrderNo: e.target.value})} />
+            ) : (
+              <p className="font-mono">{project.clientOrderNo || '未登録'}</p>
+            )}
           </div>
           <div>
             <p className="text-sm text-gray-500">顧客の担当部署 / 担当者</p>
@@ -124,6 +142,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   <option value="案件">案件</option>
                   <option value="見積中">見積中</option>
                   <option value="受注">受注</option>
+                  <option value="一部納品">一部納品</option>
                   <option value="納品済">納品済</option>
                   <option value="請求済">請求済</option>
                   <option value="入金予定">入金予定</option>
@@ -139,8 +158,33 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </div>
             ) : (
               <p>
-                <span className="px-2 py-1 bg-gray-100 rounded text-sm mr-2">{project.status}</span>
+                <span className={`px-2 py-1 rounded text-sm mr-2 font-medium ${
+                  project.status === '入金済' ? 'bg-green-100 text-green-800' :
+                  project.status === '入金予定' ? 'bg-blue-100 text-blue-800 font-bold' :
+                  project.status === '請求済' ? 'bg-yellow-100 text-yellow-800' :
+                  project.status === '納品済' ? 'bg-purple-100 text-purple-800' :
+                  'bg-gray-100'
+                }`}>{project.status}</span>
                 {project.leadStaff}
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">入金予定日 (UFJ銀行営業日)</p>
+            {isEditing ? (
+              <input 
+                type="date" 
+                className="border p-1 rounded font-mono" 
+                value={editForm.expectedPayDate} 
+                onChange={e => setEditForm({...editForm, expectedPayDate: e.target.value})} 
+              />
+            ) : (
+              <p className="font-mono">
+                {project.expectedPayDate ? (
+                  <span className="text-blue-700 bg-blue-50 px-2 py-1 rounded font-medium">
+                    {project.expectedPayDate.slice(0, 10)}
+                  </span>
+                ) : '未設定'}
               </p>
             )}
           </div>

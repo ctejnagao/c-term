@@ -18,6 +18,10 @@ export async function GET(request: Request) {
         estimates: {
           orderBy: { createdAt: 'desc' },
           take: 1
+        },
+        deliveries: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
         }
       },
       orderBy: { id: 'desc' },
