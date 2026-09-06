@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { getFiscalYearPrefix } from "@/lib/sequence";
 
 /**
  * 計上日（入金予定日）が現在の日付（システム日付）を超えている（今日以前の）
@@ -132,6 +133,17 @@ export async function syncPaymentStatuses(): Promise<{
         });
         updatedProjectsCount++;
       }
+
+      // 4. SequenceTracker の yearPrefix を正しい会計年度プレフィックス（26など）に補正
+      const currentPrefix = getFiscalYearPrefix(now);
+      await tx.sequenceTracker.updateMany({
+        where: {
+          yearPrefix: { not: currentPrefix }
+        },
+        data: {
+          yearPrefix: currentPrefix
+        }
+      });
 
       return {
         updatedProjectsCount,

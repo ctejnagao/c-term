@@ -2,15 +2,15 @@ import prisma from './prisma';
 
 /**
  * 決算日（6/30）に基づき、指定日の属する会計年度（西暦下2桁）を計算する。
- * - 7/1 以降は翌年扱いの年度となる（例: 2026/7/1 => 27年度）
- * - 6/30 以前は当年扱いの年度となる（例: 2026/6/30 => 26年度）
+ * - 7月〜翌年6月が当年度となる（例: 2026/7/1〜2027/6/30 => 26年度）
+ * - 6/30 以前は前年開始の年度となる（例: 2026/6/30 => 25年度）
  */
 export function getFiscalYearPrefix(date: Date = new Date()): string {
   const year = date.getFullYear();
   const month = date.getMonth() + 1; // 0-indexed
   
-  // 7月以降は翌年度扱い
-  const fiscalYear = month >= 7 ? year + 1 : year;
+  // 7月以降はその年の西暦、6月以前は前年の西暦（7月〜翌年6月が同一年度）
+  const fiscalYear = month >= 7 ? year : year - 1;
   
   // 西暦下2桁を返す
   return (fiscalYear % 100).toString().padStart(2, '0');
