@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import fs from 'fs';
 import path from 'path';
 import { generateNextSequence } from '@/lib/sequence';
+import { getPdfStorageDir } from '@/lib/pdfStorage';
 
 // .env に GEMINI_API_KEY が必要です
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -30,6 +31,17 @@ export async function POST(req: Request) {
     const filePath = path.join(uploadDir, uniqueFileName);
     fs.writeFileSync(filePath, buffer);
     const fileUrl = `/uploads/${uniqueFileName}`;
+
+    // 共有ストレージ（\\eggplant\share\...）への保存も試行
+    try {
+      const storageDir = getPdfStorageDir();
+      if (fs.existsSync(storageDir)) {
+        const sharedPath = path.join(storageDir, file.name);
+        fs.writeFileSync(sharedPath, buffer);
+      }
+    } catch (shareErr) {
+      console.warn('共有フォルダへの保存に失敗しました（ローカル保存のみ実行）:', shareErr);
+    }
 
     // 2. Gemini API で解析
     if (!process.env.GEMINI_API_KEY) {

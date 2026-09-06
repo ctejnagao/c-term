@@ -1,7 +1,8 @@
 import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileWarning, ExternalLink } from "lucide-react";
+import { resolvePdfFilePath } from "@/lib/pdfStorage";
 
 export default async function PdfImportDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
@@ -14,6 +15,11 @@ export default async function PdfImportDetailPage({ params }: { params: Promise<
   });
 
   if (!data) return notFound();
+
+  // 共有ストレージまたはローカルで実ファイルが存在するか確認
+  const resolvedPath = resolvePdfFilePath(data.fileName, data.fileUrl);
+  const fileExists = Boolean(resolvedPath);
+  const previewUrl = `/api/pdf-imports/${data.id}/file`;
 
   const parsedData = data.parsedData as any;
 
@@ -149,23 +155,35 @@ export default async function PdfImportDetailPage({ params }: { params: Promise<
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">元ファイルプレビュー</h2>
-            {data.fileUrl && (
+            {fileExists && (
               <a 
-                href={data.fileUrl} 
+                href={previewUrl} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="text-xs text-blue-600 hover:underline flex items-center"
+                className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium"
               >
                 別ウィンドウで開く
+                <ExternalLink className="w-3.5 h-3.5" />
               </a>
             )}
           </div>
           <div className="bg-gray-100 rounded-lg border h-[600px] flex items-center justify-center overflow-hidden">
-            {data.fileUrl?.endsWith('.pdf') ? (
-              <iframe src={data.fileUrl} className="w-full h-full rounded-lg" />
+            {!fileExists ? (
+              <div className="text-center p-8 max-w-sm">
+                <FileWarning className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+                <h3 className="font-bold text-gray-800 mb-1">ファイルが見つかりません</h3>
+                <p className="text-xs text-gray-500 mb-2">
+                  サーバー上または共有フォルダ（\\eggplant\share\...）に実ファイルが存在しないか、別環境のデータです。
+                </p>
+                <div className="text-xs text-gray-400 bg-gray-200/70 p-2 rounded break-all">
+                  {data.fileName || data.fileUrl}
+                </div>
+              </div>
+            ) : data.fileName?.toLowerCase().endsWith('.pdf') || data.fileUrl?.toLowerCase().endsWith('.pdf') ? (
+              <iframe src={previewUrl} className="w-full h-full rounded-lg" />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={data.fileUrl} alt="Preview" className="max-w-full max-h-full object-contain p-2" />
+              <img src={previewUrl} alt="Preview" className="max-w-full max-h-full object-contain p-2" />
             )}
           </div>
         </div>
