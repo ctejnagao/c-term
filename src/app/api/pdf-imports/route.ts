@@ -48,25 +48,29 @@ export async function POST(req: Request) {
     const model = genAI.getGenerativeModel({ model: modelName });
     const prompt = `
       このPDF（または画像）を解析し、以下の構造を持つJSONを出力してください。
+      書面に実際に記載・配置されている表記に従って正確に抽出してください（計算して推測するのではなく、書面に記載されている数値をそのまま抽出すること）。
+
       \`\`\`json
       {
         "type": "ORDER" | "PAYMENT_STATEMENT" | "INVOICE" | "UNKNOWN",
-        "partnerCode": "取引先コードがある場合抽出（例: K500032）",
-        "issuerName": "この書類の発行元・発注者企業名（例: 日本カラリング株式会社。宛先であるコムテックエンタープライズではなく、発注元を抽出すること）",
+        "partnerCode": "取引先CD（例: K500032）",
+        "issuerName": "発行元・発注者企業名（例: 日本カラリング株式会社。宛先であるコムテックエンタープライズではなく発注元・書類発行元企業名）",
         "partnerName": "取引先名（発注元または相手先）",
-        "documentNumber": "発注NOや購買NO、支払NOなど（PDF右上の購買NO：KB2026000001454などがあれば必ずこれを抽出）",
-        "estimateNo": "お見積NO、見積No、見積番号がある場合はその番号（例: 2501723）",
-        "date": "2026-04-30のような日付フォーマット（発注日等）",
-        "deliveryDate": "希望納期や納入期日がある場合（2026-08-31のような日付フォーマット）",
-        "totalAmount": "税込合計金額（数値のみ、カンマなし）",
+        "documentNumber": "書面に記載の「購買NO」「支払NO」「発注NO」などの番号（例: KB2026000001454、SH2026000000435）",
+        "estimateNo": "書面に記載の「お見積NO.」「お見積NO」「見積番号」がある場合はその番号（例: 2501723）",
+        "date": "発注日や計上日などの日付（2026-04-30形式）",
+        "deliveryDate": "希望納期や納入期日がある場合（2026-08-31形式）",
+        "subtotalAmount": "書面に配置・印字されている「税抜金額合計」または「税抜金額総合計」の金額（数値のみ、カンマなし。例: 2500000）",
+        "taxAmount": "書面に配置・印字されている「消費税額合計」または「消費税額総合計」の金額（数値のみ、カンマなし。例: 250000）",
+        "totalAmount": "書面に配置・印字されている「税込金額合計」または「税込金額総合計」の金額（数値のみ、カンマなし。例: 2750000）",
         "items": [
           {
-            "estimateNo": "明細行ごとにお見積NOがある場合抽出",
-            "itemName": "品名",
+            "estimateNo": "明細行に記載の「お見積NO.」がある場合抽出",
+            "itemName": "明細行に記載の「商品名」または品名",
             "quantity": "数量（数値）",
-            "unit": "単位",
+            "unit": "単位（例: 式）",
             "unitPrice": "単価（数値）",
-            "amount": "金額（数値）"
+            "amount": "金額合計または金額（数値）"
           }
         ]
       }
@@ -94,6 +98,29 @@ export async function POST(req: Request) {
     } catch (e) {
       console.error("Gemini Parse Error:", responseText);
       throw new Error("Geminiの解析結果が不正なJSONでした。");
+    }
+
+    // データの正規化
+    if (!parsedData.estimateNo && Array.isArray(parsedData.items)) {
+      const itemWithEst = parsedData.items.find((it: any) => it.estimateNo);
+      if (itemWithEst) {
+        parsedData.estimateNo = itemWithEst.estimateNo;
+      }
+    }
+
+    // 書面からsubtotalAmountが直接取得できなかった場合のみ明細の記載金額から補完
+    if (parsedData.subtotalAmount === undefined || parsedData.subtotalAmount === null) {
+      if (Array.isArray(parsedData.items) && parsedData.items.length > 0) {
+        const itemsTotal = parsedData.items.reduce((sum: number, it: any) => sum + (Number(it.amount) || 0), 0);
+        if (itemsTotal > 0) {
+          parsedData.subtotalAmount = itemsTotal;
+        }
+      }
+    }
+
+    // 代表商品名
+    if (!parsedData.itemName && Array.isArray(parsedData.items) && parsedData.items.length > 0) {
+      parsedData.itemName = parsedData.items[0]?.itemName || '';
     }
 
     // 3. PdfImport レコード作成
