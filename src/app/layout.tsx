@@ -63,10 +63,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </div>
 
-              {/* 3. 現金出納 */}
+              {/* 3. 資金・出納管理 */}
               <div>
-                <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">現金出納</h2>
+                <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">資金・出納管理</h2>
                 <div className="flex flex-col gap-1 pl-2">
+                  <Link href="/bank-transactions" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-emerald-400 font-medium">銀行残高・明細取込</Link>
                   <Link href="/cash-transactions" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">社員現金出納</Link>
                 </div>
               </div>

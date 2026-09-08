@@ -65,6 +65,7 @@ export async function POST(req: Request) {
 
       【書類種別の判定】
       - 「取引先別支払明細表」や「支払明細」または「支払NO」がある書類は "PAYMENT_STATEMENT"
+      - 「仕入割引額のご請求」や「仕割NO」または「仕入割引額」がある書類は "DISCOUNT_INVOICE"
       - 「注文書」または「購買NO」がある書類は "ORDER"
       - 「請求書」は "INVOICE"
 
@@ -73,15 +74,20 @@ export async function POST(req: Request) {
 
       \`\`\`json
       {
-        "type": "ORDER" | "PAYMENT_STATEMENT" | "INVOICE" | "UNKNOWN",
+        "type": "ORDER" | "PAYMENT_STATEMENT" | "DISCOUNT_INVOICE" | "INVOICE" | "UNKNOWN",
         "partnerCode": "取引先CD（例: K500032）",
         "issuerName": "発行元・発注者企業名（例: 日本カラリング株式会社。宛先であるコムテックエンタープライズではなく発注元・書類発行元企業名）",
         "partnerName": "取引先名（発注元または相手先）",
-        "documentNumber": "書面に記載の「購買NO」「支払NO」「発注NO」などの番号（例: KB2026000001454、SH2026000000579）",
+        "documentNumber": "書面に記載の「購買NO」「支払NO」「仕割NO」「発注NO」などの番号（例: KB2026000001454、SH2025000000476-SRWB）",
         "estimateNo": "書面に記載の「お見積NO.」「お見積NO」「見積番号」がある場合はその番号（例: 2501723）",
         "date": "計上日または発注日などの日付（2026-08-31形式）",
-        "paymentDate": "書面に記載されている支払日がある場合（例: 2026-09-30形式）",
+        "paymentDate": "書面に記載されている支払日またはご入金日（相殺日）がある場合（例: 2025-08-29形式）",
         "deliveryDate": "希望納期や納入期日がある場合（2026-08-31形式）",
+        "discountTaxExcluded": "税抜仕入割引額がある場合（数値のみ、例: 2797）",
+        "discountTax": "仕入割引の消費税額がある場合（数値のみ、例: 279）",
+        "discountTotal": "税込仕入割引額がある場合（数値のみ、例: 3076）",
+        "targetGrossAmount": "備考等に記載の税込仕入検収金額または対象金額（数値のみ、例: 297000）",
+        "settlementDate": "ご入金日（相殺日）がある場合（2025-08-29形式）",
         "subtotalAmount": "書面に配置・印字されている「税抜金額合計」または「税抜金額総合計」の金額（数値のみ、カンマなし。例: 4236500）",
         "taxAmount": "書面に配置・印字されている「消費税額合計」または「消費税額総合計」の金額（数値のみ、カンマなし。例: 423650）",
         "totalAmount": "書面に配置・印字されている「税込金額合計」または「税込金額総合計」の金額（数値のみ、カンマなし。例: 4660150）",
@@ -425,6 +431,52 @@ export async function POST(req: Request) {
             status: 'UNMATCHED',
             expectedPayDate: expectedPayDate.toISOString().slice(0, 10),
           });
+        }
+      }
+    }
+
+    // 8. 仕入割引額請求書（DISCOUNT_INVOICE）の処理
+    let discountResult = null;
+    if (parsedData.type === 'DISCOUNT_INVOICE' || parsedData.discountTotal) {
+      const discountTotal = Number(parsedData.discountTotal) || 0;
+      const targetGross = Number(parsedData.targetGrossAmount) || 0;
+      const settlementDate = parsedData.settlementDate || parsedData.paymentDate;
+
+      if (partner) {
+        const matchedProject = await prisma.project.findFirst({
+          where: {
+            partnerId: partner.id,
+            deletedAt: null,
+            ...(targetGross > 0 ? { orderAmount: targetGross } : {})
+          },
+          include: { invoices: true },
+          orderBy: { id: 'desc' }
+        });
+
+        if (matchedProject) {
+          if (matchedProject.invoices.length > 0) {
+            await prisma.invoice.update({
+              where: { id: matchedProject.invoices[0].id },
+              data: { discountAmount: discountTotal }
+            });
+          }
+
+          if (settlementDate) {
+            await prisma.project.update({
+              where: { id: matchedProject.id },
+              data: {
+                status: '入金予定',
+                expectedPayDate: new Date(settlementDate)
+              }
+            });
+          }
+
+          discountResult = {
+            project: matchedProject,
+            discountTotal,
+            targetGross,
+            settlementDate,
+          };
         }
       }
     }
