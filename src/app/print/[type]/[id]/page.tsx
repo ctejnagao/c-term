@@ -195,16 +195,27 @@ export default function PrintPage({ params }: { params: Promise<{ type: string, 
               </tr>
             </thead>
             <tbody>
-              {data.items?.map((item: any, index: number) => (
-                <tr key={index} className="border-b border-black h-12">
-                  <td className="border-r border-black p-2 text-center">{index + 1}.</td>
-                  <td className="border-r border-black p-2">{item.itemName}</td>
-                  <td className="border-r border-black p-2 text-center">{Number(item.quantity).toFixed(1)} <span className="ml-1">{item.unit}</span></td>
-                  <td className="border-r border-black p-2 text-right">{Number(item.unitPrice).toLocaleString()}</td>
-                  <td className="border-r border-black p-2 text-right">{Number(item.amount || (item.quantity * item.unitPrice)).toLocaleString()}</td>
-                  <td className="p-2 text-xs text-center break-words">{isDelivery ? data.project?.clientOrderNo : ''}</td>
-                </tr>
-              ))}
+              {data.items?.map((item: any, index: number) => {
+                const isRemark = Number(item.unitPrice || 0) === 0;
+                return (
+                  <tr key={index} className="border-b border-black h-12">
+                    <td className="border-r border-black p-2 text-center">{index + 1}.</td>
+                    <td className="border-r border-black p-2">{item.itemName}</td>
+                    <td className="border-r border-black p-2 text-center">
+                      {!isRemark && (
+                        <>{Number(item.quantity).toFixed(1)} <span className="ml-1">{item.unit}</span></>
+                      )}
+                    </td>
+                    <td className="border-r border-black p-2 text-right">
+                      {!isRemark && Number(item.unitPrice).toLocaleString()}
+                    </td>
+                    <td className="border-r border-black p-2 text-right">
+                      {!isRemark && Number(item.amount || (item.quantity * item.unitPrice)).toLocaleString()}
+                    </td>
+                    <td className="p-2 text-xs text-center break-words">{isDelivery ? data.project?.clientOrderNo : ''}</td>
+                  </tr>
+                );
+              })}
               {/* Fill empty rows to make it look like excel (approx 10 rows total) */}
               {Array.from({ length: Math.max(0, 10 - (data.items?.length || 0)) }).map((_, i) => (
                 <tr key={`empty-${i}`} className="border-b border-black h-12">

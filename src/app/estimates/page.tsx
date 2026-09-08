@@ -11,7 +11,7 @@ export default function EstimatesPage() {
   const [loading, setLoading] = useState(true);
   
   const [filterStaff, setFilterStaff] = useState('');
-  const [filterStatus, setFilterStatus] = useState('案件');
+  const [filterStatus, setFilterStatus] = useState('見積中');
   const [filterPartner, setFilterPartner] = useState('');
 
   useEffect(() => {
@@ -30,7 +30,7 @@ export default function EstimatesPage() {
     filteredEstimates = filteredEstimates.filter((e: any) => e.project?.leadStaff === filterStaff);
   }
   if (filterStatus) {
-    filteredEstimates = filteredEstimates.filter((e: any) => e.project?.status === filterStatus);
+    filteredEstimates = filteredEstimates.filter((e: any) => (e.project?.status || '見積中') === filterStatus);
   }
   if (filterPartner) {
     filteredEstimates = filteredEstimates.filter((e: any) => String(e.partnerId) === filterPartner);

@@ -30,20 +30,22 @@ export async function POST(request: Request) {
     let subtotal = 0;
     let purchaseCost = 0;
     const items = data.items.map((item: any, index: number) => {
-      const amount = Number(item.quantity) * Number(item.unitPrice);
+      const q = Number(item.quantity) || 0;
+      const up = Number(item.unitPrice) || 0;
+      const amount = q * up;
       subtotal += amount;
       
-      const itemCost = item.costPrice ? Number(item.quantity) * Number(item.costPrice) : 0;
+      const itemCost = item.costPrice ? q * Number(item.costPrice) : 0;
       purchaseCost += itemCost;
 
       return {
         itemOrder: index + 1,
         itemName: item.itemName,
-        quantity: item.quantity,
-        unit: item.unit,
-        unitPrice: item.unitPrice,
+        quantity: q,
+        unit: item.unit || null,
+        unitPrice: up,
         amount,
-        costPrice: item.costPrice || null,
+        costPrice: item.costPrice ? Number(item.costPrice) : null,
       };
     });
 

@@ -77,8 +77,10 @@ function NewEstimateContent() {
     let subtotal = 0;
     let cost = 0;
     items.forEach(i => {
-      subtotal += Number(i.quantity) * Number(i.unitPrice);
-      cost += Number(i.quantity) * Number(i.costPrice || 0);
+      const q = Number(i.quantity) || 0;
+      const up = Number(i.unitPrice) || 0;
+      subtotal += q * up;
+      cost += q * (Number(i.costPrice) || 0);
     });
     return { subtotal, tax: Math.floor(subtotal * 0.1), total: subtotal + Math.floor(subtotal * 0.1), cost };
   };
@@ -192,7 +194,7 @@ function NewEstimateContent() {
                     <input type="text" required className="w-full border p-1 rounded" value={item.itemName} onChange={e => handleItemChange(index, 'itemName', e.target.value)} />
                   </td>
                   <td className="p-2">
-                    <input type="number" required min="0.01" step="0.01" className="w-full border p-1 rounded" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', e.target.value)} />
+                    <input type="number" min="0" step="any" className="w-full border p-1 rounded" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', e.target.value)} />
                   </td>
                   <td className="p-2">
                     <input type="text" className="w-full border p-1 rounded" value={item.unit} onChange={e => handleItemChange(index, 'unit', e.target.value)} />
@@ -204,7 +206,7 @@ function NewEstimateContent() {
                     <input type="number" className="w-full border p-1 rounded" value={item.costPrice} onChange={e => handleItemChange(index, 'costPrice', e.target.value)} />
                   </td>
                   <td className="p-2 text-right align-middle">
-                    ¥{(Number(item.quantity) * Number(item.unitPrice)).toLocaleString()}
+                    {Number(item.unitPrice || 0) === 0 ? '' : `¥${(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toLocaleString()}`}
                   </td>
                   <td className="p-2 text-center align-middle">
                     <button type="button" onClick={() => handleRemoveItem(index)} className="text-red-600 hover:text-red-800 font-bold">×</button>
