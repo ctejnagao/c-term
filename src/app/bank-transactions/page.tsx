@@ -127,7 +127,11 @@ type Summary = {
   totalCount: number;
 };
 
+import BankGate from '@/components/BankGate';
+import { useBankAuth } from '@/context/BankAuthContext';
+
 export default function BankTransactionsPage() {
+  const { isAuthenticated } = useBankAuth();
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<BankTransaction[]>([]);
   const [summary, setSummary] = useState<Summary>({
@@ -288,8 +292,9 @@ export default function BankTransactionsPage() {
   };
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     fetchTransactions();
-  }, [selectedMonth, filterType]);
+  }, [selectedMonth, filterType, isAuthenticated]);
 
   // Open Reconcile Modal
   const openReconcileModal = async (tx: BankTransaction) => {
@@ -748,7 +753,8 @@ export default function BankTransactionsPage() {
   };
 
   return (
-    <div className="flex-1 bg-slate-950 text-slate-100 p-6 overflow-y-auto">
+    <BankGate>
+      <div className="flex-1 bg-slate-950 text-slate-100 p-6 overflow-y-auto">
       {/* Top Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
@@ -2551,6 +2557,7 @@ export default function BankTransactionsPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </BankGate>
   );
 }

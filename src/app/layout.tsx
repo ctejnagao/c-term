@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Sidebar from "@/components/Sidebar";
+import { BankAuthProvider } from "@/context/BankAuthContext";
 import "./globals.css";
-import Link from 'next/link';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,95 +26,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex bg-gray-50 text-gray-900">
-        <aside className="w-64 bg-slate-900 text-white min-h-screen p-4 flex flex-col print:hidden">
-          <div className="mb-8 px-2">
-            <Link href="/">
-              <img src="/logo.png" alt="C-TERP" className="w-48 h-auto object-contain drop-shadow-md brightness-110" />
-            </Link>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            <nav className="flex flex-col gap-6">
-              
-              {/* 1. 売掛管理 */}
-              <div>
-                <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">売掛管理</h2>
-                <div className="flex flex-col gap-1 pl-2">
-                  <Link href="/" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">案件・プロジェクト</Link>
-                  <Link href="/estimates" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">見積管理</Link>
-                  <Link href="/deliveries" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">納品管理</Link>
-                  <Link href="/invoices" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">請求・入金管理</Link>
-                </div>
-              </div>
-
-              {/* 2. 買掛管理 */}
-              <div>
-                <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">買掛・外注管理</h2>
-                <div className="flex flex-col gap-1 pl-2">
-                  <Link href="/orders" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-teal-300">受注・分納管理</Link>
-                  <Link href="/purchases" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">発注・支払管理</Link>
-                  <Link href="/pdf-imports" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-yellow-300">PDF自動取込</Link>
-                </div>
-              </div>
-
-              {/* 3. 定期契約管理 */}
-              <div>
-                <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">定期契約管理</h2>
-                <div className="flex flex-col gap-1 pl-2">
-                  <Link href="/contracts" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-blue-300">定期契約・一括請求</Link>
-                </div>
-              </div>
-
-              {/* 3. 資金・出納管理 */}
-              <div>
-                <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">資金・出納管理</h2>
-                <div className="flex flex-col gap-1 pl-2">
-                  <Link href="/bank-transactions" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-emerald-400 font-medium">銀行残高・明細取込</Link>
-                  <Link href="/cash-transactions" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">社員現金出納</Link>
-                </div>
-              </div>
-
-              {/* 4. マスタ管理 */}
-              <div>
-                <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">マスタ管理</h2>
-                <div className="flex flex-col gap-1 pl-2">
-                  <Link href="/partners" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">取引先マスタ</Link>
-                  <Link href="/employees" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">社員マスタ</Link>
-                  <Link href="/account-subjects" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-teal-300">勘定科目マスタ</Link>
-                  <Link href="/settings/company" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">自社基本マスタ</Link>
-                </div>
-              </div>
-
-              {/* 5. 社内AI・備忘録 */}
-              <div>
-                <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">社内AI・備忘録</h2>
-                <div className="flex flex-col gap-1 pl-2">
-                  <Link href="/knowledge" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">社内AI・備忘録</Link>
-                  <Link href="/c-terp-overview.pdf" target="_blank" rel="noopener noreferrer" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-orange-300">システム概要 (PDF)</Link>
-                </div>
-              </div>
-
-              {/* 6. 営業・提案ツール */}
-              <div>
-                <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">営業・提案ツール</h2>
-                <div className="flex flex-col gap-1 pl-2">
-                  <Link href="/mocks" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-teal-300">モックカタログ</Link>
-                </div>
-              </div>
-
-              {/* 7. システム管理 */}
-              <div>
-                <h2 className="px-3 text-sm font-bold text-gray-300 border-b border-slate-700 pb-1 mb-2 tracking-wider">システム管理</h2>
-                <div className="flex flex-col gap-1 pl-2">
-                  <Link href="/system/monitor" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-blue-300">サーバー監視</Link>
-                </div>
-              </div>
-
-            </nav>
-          </div>
-        </aside>
-        <main className="flex-1 overflow-auto flex flex-col">
-          {children}
-        </main>
+        <BankAuthProvider>
+          <Sidebar />
+          <main className="flex-1 overflow-auto flex flex-col min-w-0">
+            {children}
+          </main>
+        </BankAuthProvider>
       </body>
     </html>
   );
