@@ -259,6 +259,8 @@ model CashTransaction {
   description    String // 摘要
   amount         Int // 金額
   accountSubject String  @default("旅費交通費") // 勘定科目
+  accountSubjectId Int?
+  accountSubjectRef AccountSubject? @relation(fields: [accountSubjectId], references: [id])
   taxCategory    String  @default("仕入10％") // 消費税区分
 
   createdAt DateTime  @default(now())
@@ -268,6 +270,24 @@ model CashTransaction {
   @@index([transactionDate])
   @@index([employeeId])
   @@index([projectId])
+  @@index([accountSubjectId])
+}
+
+// 勘定科目マスタ
+model AccountSubject {
+  id               Int               @id @default(autoincrement())
+  code             String?           @unique // 科目コード (任意)
+  name             String            @unique // 科目名 (例: 旅費交通費)
+  isForCash        Boolean           @default(true) // 小口現金利用フラグ
+  isActive         Boolean           @default(true) // 有効フラグ
+  displayOrder     Int               @default(0) // 表示順
+  description      String? // 摘要・用途説明
+  cashTransactions CashTransaction[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime? // 論理削除
+
+  @@index([isForCash])
 }
 
 // 月次残高・繰越管理

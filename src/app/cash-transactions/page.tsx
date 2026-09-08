@@ -27,6 +27,7 @@ export default function CashTransactionsPage() {
   
   const [employees, setEmployees] = useState<{id: number, name: string}[]>([]);
   const [projects, setProjects] = useState<{id: number, name: string}[]>([]);
+  const [accountSubjects, setAccountSubjects] = useState<{id: number, name: string}[]>([]);
   
   const [formData, setFormData] = useState({
     transactionDate: '',
@@ -47,17 +48,31 @@ export default function CashTransactionsPage() {
         const companyRes = await fetch('/api/company-info');
         const companyData = await companyRes.json();
         
-        // Fetch dropdown data
-        const [empRes, projRes] = await Promise.all([
+        // Fetch dropdown data (小口現金用勘定科目のみ取得)
+        const [empRes, projRes, subjRes] = await Promise.all([
           fetch('/api/employees'),
-          fetch('/api/projects')
+          fetch('/api/projects'),
+          fetch('/api/account-subjects?forCash=true')
         ]);
-        setEmployees(await empRes.json());
-        setProjects(await projRes.json());
+        const empData = await empRes.json();
+        const projData = await projRes.json();
+        const subjData = await subjRes.json();
+
+        setEmployees(Array.isArray(empData) ? empData : []);
+        setProjects(Array.isArray(projData) ? projData : []);
+        setAccountSubjects(Array.isArray(subjData) ? subjData : []);
+
+        const defaultSubject = Array.isArray(subjData) && subjData.length > 0
+          ? (subjData.some((s: any) => s.name === '旅費交通費') ? '旅費交通費' : subjData[0].name)
+          : '旅費交通費';
 
         const defaultMonth = companyData?.currentProcessingMonth || new Date().toISOString().slice(0, 7);
         setYearMonth(defaultMonth);
-        setFormData(prev => ({ ...prev, transactionDate: `${defaultMonth}-01` }));
+        setFormData(prev => ({
+          ...prev,
+          transactionDate: `${defaultMonth}-01`,
+          accountSubject: defaultSubject,
+        }));
       } catch (err) {
         console.error(err);
       }
@@ -286,14 +301,16 @@ export default function CashTransactionsPage() {
             <label className="block text-xs text-gray-500 mb-1">金額</label>
             <input type="number" name="amount" value={formData.amount} onChange={handleFormChange} required placeholder="¥ 0" className="w-full border rounded px-3 py-2 text-sm" />
           </div>
-          <div className="w-32">
+          <div className="w-36">
             <label className="block text-xs text-gray-500 mb-1">勘定科目</label>
             <select name="accountSubject" value={formData.accountSubject} onChange={handleFormChange} className="w-full border rounded px-3 py-2 text-sm">
-              <option value="旅費交通費">旅費交通費</option>
-              <option value="消耗品費">消耗品費</option>
-              <option value="雑費">雑費</option>
-              <option value="会議費">会議費</option>
-              <option value="水道光熱費">水道光熱費</option>
+              {accountSubjects.length === 0 ? (
+                <option value="旅費交通費">旅費交通費</option>
+              ) : (
+                accountSubjects.map(s => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))
+              )}
             </select>
           </div>
           <div className="w-28">

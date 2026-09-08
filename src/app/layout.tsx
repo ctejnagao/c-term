@@ -77,6 +77,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div className="flex flex-col gap-1 pl-2">
                   <Link href="/partners" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">取引先マスタ</Link>
                   <Link href="/employees" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">社員マスタ</Link>
+                  <Link href="/account-subjects" className="block px-3 py-2 text-sm rounded hover:bg-gray-800 text-teal-300">勘定科目マスタ</Link>
                   <Link href="/settings/company" className="block px-3 py-2 text-sm rounded hover:bg-gray-800">自社基本マスタ</Link>
                 </div>
               </div>

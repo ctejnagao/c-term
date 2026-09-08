@@ -7,6 +7,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { id: paramId } = await params;
     const id = Number(paramId);
     
+    let accountSubjectId = data.accountSubjectId !== undefined ? (data.accountSubjectId ? Number(data.accountSubjectId) : null) : undefined;
+    if (accountSubjectId === undefined && data.accountSubject) {
+      const matched = await prisma.accountSubject.findFirst({
+        where: { name: data.accountSubject, deletedAt: null }
+      });
+      if (matched) accountSubjectId = matched.id;
+    }
+
     const transaction = await prisma.cashTransaction.update({
       where: { id },
       data: {
@@ -18,11 +26,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         description: data.description,
         amount: Number(data.amount),
         accountSubject: data.accountSubject,
+        accountSubjectId,
         taxCategory: data.taxCategory,
       },
       include: {
         employee: true,
         project: true,
+        accountSubjectRef: true,
       }
     });
     return NextResponse.json(transaction);

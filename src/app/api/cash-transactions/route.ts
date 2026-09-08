@@ -43,6 +43,14 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const data = await req.json();
+    let accountSubjectId = data.accountSubjectId ? Number(data.accountSubjectId) : null;
+    if (!accountSubjectId && data.accountSubject) {
+      const matched = await prisma.accountSubject.findFirst({
+        where: { name: data.accountSubject, deletedAt: null }
+      });
+      if (matched) accountSubjectId = matched.id;
+    }
+
     const transaction = await prisma.cashTransaction.create({
       data: {
         transactionDate: new Date(data.transactionDate),
@@ -53,11 +61,13 @@ export async function POST(req: Request) {
         description: data.description,
         amount: Number(data.amount),
         accountSubject: data.accountSubject,
+        accountSubjectId,
         taxCategory: data.taxCategory,
       },
       include: {
         employee: true,
         project: true,
+        accountSubjectRef: true,
       }
     });
     return NextResponse.json(transaction);
