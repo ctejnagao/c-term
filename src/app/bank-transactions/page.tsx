@@ -104,6 +104,17 @@ type BankTransaction = {
   isReconciled: boolean;
 };
 
+type AccountMaster = {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  subCategory: string | null;
+  taxType: string;
+  statementItem: string | null;
+  borrowLend: string | null;
+};
+
 type Rule = {
   id: number;
   keyword: string;
@@ -134,6 +145,7 @@ export default function BankTransactionsPage() {
   const { isAuthenticated } = useBankAuth();
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<BankTransaction[]>([]);
+  const [accountMasters, setAccountMasters] = useState<AccountMaster[]>([]);
   const [summary, setSummary] = useState<Summary>({
     totalDeposits: 0,
     totalWithdrawals: 0,
@@ -219,20 +231,28 @@ export default function BankTransactionsPage() {
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Available subjects for fast pick
+  // Available subjects for fast pick (弥生会計正式コード準拠: ㈱コムテックエンタープライズ)
   const commonSubjects = [
-    { name: '売掛金', code: '1130', tax: '対象外' },
-    { name: '仕入高', code: '5111', tax: '課対仕入10%' },
-    { name: '未払金', code: '2115', tax: '課対仕入10%' },
-    { name: '給料手当', code: '6102', tax: '対象外' },
-    { name: '法定福利費', code: '6105', tax: '対象外' },
-    { name: '支払リース料', code: '6125', tax: '課対仕入10%' },
-    { name: '通信費', code: '6117', tax: '課対仕入10%' },
-    { name: '車両費', code: '6126', tax: '課対仕入10%' },
-    { name: '支払利息', code: '7111', tax: '非課税' },
-    { name: '保険料', code: '6130', tax: '非課税' },
-    { name: '支払手数料', code: '6121', tax: '課対仕入10%' },
-    { name: '水道光熱費', code: '6116', tax: '課対仕入10%' },
+    { name: '売掛金', code: '166', tax: '対象外' },
+    { name: '仕入高', code: '550', tax: '課対仕入10%' },
+    { name: '未払金', code: '314', tax: '対象外' },
+    { name: '給料手当', code: '712', tax: '対象外' },
+    { name: '法定福利費', code: '716', tax: '対象外' },
+    { name: '福利厚生費', code: '717', tax: '課対仕入10%' },
+    { name: 'リース料', code: '737', tax: '課対仕入10%' },
+    { name: '旅費交通費', code: '722', tax: '課対仕入10%' },
+    { name: '通信費', code: '724', tax: '課対仕入10%' },
+    { name: '消耗品費', code: '728', tax: '課対仕入10%' },
+    { name: '事務用品費', code: '729', tax: '課対仕入10%' },
+    { name: '車両費', code: '659', tax: '課対仕入10%' },
+    { name: '支払利息', code: '821', tax: '対象外' },
+    { name: '保険料', code: '733', tax: '対象外' },
+    { name: '支払手数料', code: '734', tax: '課対仕入10%' },
+    { name: '水道光熱費', code: '725', tax: '課対仕入10%' },
+    { name: '租税公課', code: '726', tax: '対象外' },
+    { name: '会議費', code: '738', tax: '課対仕入10%' },
+    { name: '図書費', code: '739', tax: '課対仕入10%' },
+    { name: '雑費', code: '745', tax: '課対仕入10%' },
   ];
 
   // Load transactions
@@ -291,9 +311,24 @@ export default function BankTransactionsPage() {
     }
   };
 
+  // Load Account Masters
+  const fetchAccountMasters = async () => {
+    try {
+      const res = await fetch('/api/account-masters');
+      const data = await res.json();
+      if (data.data && Array.isArray(data.data)) {
+        setAccountMasters(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch account masters:', err);
+    }
+  };
+
   useEffect(() => {
     if (!isAuthenticated) return;
     fetchTransactions();
+    fetchRules();
+    fetchAccountMasters();
   }, [selectedMonth, filterType, isAuthenticated]);
 
   // Open Reconcile Modal
@@ -608,6 +643,14 @@ export default function BankTransactionsPage() {
     }
     return rowsWithRunningBalances;
   })();
+
+  // Grouped Account Masters by category
+  const groupedAccountMasters = accountMasters.reduce((acc, m) => {
+    const cat = m.category || 'その他';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(m);
+    return acc;
+  }, {} as { [key: string]: AccountMaster[] });
 
   // Rule creation
   const handleSaveRule = async (e: React.FormEvent) => {
@@ -1613,24 +1656,57 @@ export default function BankTransactionsPage() {
                           {isEditing ? (
                             <div className="flex flex-col gap-1">
                               <select
-                                value={editFormData.accountName}
+                                value={editFormData.accountCode ? `${editFormData.accountCode}_${editFormData.accountName}` : (editFormData.accountName || '')}
                                 onChange={e => {
-                                  const sel = commonSubjects.find(s => s.name === e.target.value);
-                                  setEditFormData(prev => ({
-                                    ...prev,
-                                    accountName: e.target.value,
-                                    accountCode: sel?.code || '',
-                                    taxType: sel?.tax || prev.taxType,
-                                  }));
+                                  const val = e.target.value;
+                                  if (!val) {
+                                    setEditFormData(prev => ({ ...prev, accountName: '', accountCode: '' }));
+                                    return;
+                                  }
+                                  if (val.includes('_')) {
+                                    const [code, ...nameParts] = val.split('_');
+                                    const name = nameParts.join('_');
+                                    const master = accountMasters.find(m => m.code === code);
+                                    setEditFormData(prev => {
+                                      let resolvedTax = prev.taxType;
+                                      if (master?.taxType === '課対仕入') resolvedTax = '課対仕入10%';
+                                      else if (master?.taxType === '課税売上') resolvedTax = '課税売上10%';
+                                      else if (master?.taxType === '対象外') resolvedTax = '対象外';
+                                      return {
+                                        ...prev,
+                                        accountCode: code,
+                                        accountName: name,
+                                        taxType: resolvedTax,
+                                      };
+                                    });
+                                  } else {
+                                    const sel = commonSubjects.find(s => s.name === val);
+                                    setEditFormData(prev => ({
+                                      ...prev,
+                                      accountName: val,
+                                      accountCode: sel?.code || '',
+                                      taxType: sel?.tax || prev.taxType,
+                                    }));
+                                  }
                                 }}
                                 className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200"
                               >
-                                <option value="">(科目を選択)</option>
-                                {commonSubjects.map(s => (
-                                  <option key={s.name} value={s.name}>
-                                    {s.code ? `[${s.code}] ` : ''}
-                                    {s.name}
-                                  </option>
+                                <option value="">(勘定科目を選択)</option>
+                                <optgroup label="⭐ よく使う主要科目 (弥生正式コード)">
+                                  {commonSubjects.map(s => (
+                                    <option key={`common_${s.code}`} value={`${s.code}_${s.name}`}>
+                                      [{s.code}] {s.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                                {Object.entries(groupedAccountMasters).map(([category, items]) => (
+                                  <optgroup key={category} label={`📂 ${category}`}>
+                                    {items.map(m => (
+                                      <option key={m.code} value={`${m.code}_${m.name}`}>
+                                        [{m.code}] {m.name}
+                                      </option>
+                                    ))}
+                                  </optgroup>
                                 ))}
                               </select>
                               <input
@@ -2293,6 +2369,48 @@ export default function BankTransactionsPage() {
                   />
                 </div>
                 <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">弥生勘定科目マスタから選択</label>
+                  <select
+                    value={ruleFormData.accountCode ? `${ruleFormData.accountCode}_${ruleFormData.accountName}` : ''}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (!val) return;
+                      const [code, ...nameParts] = val.split('_');
+                      const name = nameParts.join('_');
+                      const master = accountMasters.find(m => m.code === code);
+                      let resolvedTax = ruleFormData.taxType;
+                      if (master?.taxType === '課対仕入') resolvedTax = '課対仕入10%';
+                      else if (master?.taxType === '課税売上') resolvedTax = '課税売上10%';
+                      else if (master?.taxType === '対象外') resolvedTax = '対象外';
+                      setRuleFormData(prev => ({
+                        ...prev,
+                        accountCode: code,
+                        accountName: name,
+                        taxType: resolvedTax,
+                      }));
+                    }}
+                    className="w-full bg-slate-900 border border-emerald-700/60 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="">-- マスタから自動入力 --</option>
+                    <optgroup label="⭐ よく使う主要科目 (弥生正式コード)">
+                      {commonSubjects.map(s => (
+                        <option key={`rule_common_${s.code}`} value={`${s.code}_${s.name}`}>
+                          [{s.code}] {s.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                    {Object.entries(groupedAccountMasters).map(([category, items]) => (
+                      <optgroup key={`rule_${category}`} label={`📂 ${category}`}>
+                        {items.map(m => (
+                          <option key={`rule_${m.code}`} value={`${m.code}_${m.name}`}>
+                            [{m.code}] {m.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="text-[11px] text-slate-400 block mb-1">勘定科目名 *</label>
                   <input
                     type="text"
@@ -2304,10 +2422,10 @@ export default function BankTransactionsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">科目コード (任意)</label>
+                  <label className="text-[11px] text-slate-400 block mb-1">科目コード (弥生コード)</label>
                   <input
                     type="text"
-                    placeholder="例: 2115, 6125"
+                    placeholder="例: 122, 722, 724"
                     value={ruleFormData.accountCode}
                     onChange={e => setRuleFormData({ ...ruleFormData, accountCode: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"

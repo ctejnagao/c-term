@@ -509,20 +509,46 @@ model CardStatement {
 }
 
 // -------------------------------------------------------------
-// 6. 銀行明細・自動仕訳ルール (弥生会計連動)
+// 6. 弥生会計 勘定科目マスタ
+// -------------------------------------------------------------
+model AccountMaster {
+  id            String            @id @default(cuid())
+  code          String            @unique // サーチキー数字 (例: "122", "722", "724")
+  name          String            // 勘定科目名 (例: "普通　三菱UFJ銀行", "旅費交通費")
+  category      String            // 大分類 (例: "資産", "負債", "純資産", "売上高", "売上原価", "販売管理費", "営業外収益", "営業外費用", "特別利益", "特別損失", "製造原価")
+  subCategory   String?           // 中分類 (例: "現金・預金", "売上債権", "有形固定資産", "労務費", "製造経費" 等)
+  taxType       String            @default("対象外") // 税区分 (例: "課対仕入", "課税売上", "対象外")
+  taxRate       String?           // 税率 (例: "標準自動")
+  taxFraction   String?           // 税端数処理 (例: "切り捨て", "指定なし")
+  statementItem String?           // 決算書項目 (例: "普通預金", "旅費交通費")
+  borrowLend    String?           // 貸借区分 (例: "借方", "貸方")
+  rules         AccountCodeRule[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([category])
+  @@index([name])
+}
+
+// -------------------------------------------------------------
+// 7. 銀行明細・自動仕訳ルール (弥生会計連動)
 // -------------------------------------------------------------
 model AccountCodeRule {
-  id             Int       @id @default(autoincrement())
-  keyword        String    @unique // マッチングキーワード (例: "ラクテンカ−ド", "ＳＢＣ＆Ｓ", "ＳＭＢＣ")
-  accountCode    String?   // 勘定科目コード
-  accountName    String    // 勘定科目名 (例: "未払金", "通信費", "消耗品費", "福利厚生費")
-  subAccountCode String?   // 補助科目コード
-  subAccountName String?   // 補助科目名
-  taxType        String?   // 税区分 (例: "課対仕入10%", "対象外")
-  priority       Int       @default(0) // 適用優先度
-  isActive       Boolean   @default(true)
+  id             Int            @id @default(autoincrement())
+  keyword        String         @unique // マッチングキーワード (例: "ラクテンカ−ド", "ＳＢＣ＆Ｓ", "ＳＭＢＣ")
+  accountCode    String?        // 勘定科目コード
+  accountName    String         // 勘定科目名 (例: "未払金", "通信費", "消耗品費", "福利厚生費")
+  subAccountCode String?        // 補助科目コード
+  subAccountName String?        // 補助科目名
+  taxType        String?        // 税区分 (例: "課対仕入10%", "対象外")
+  priority       Int            @default(0) // 適用優先度
+  isActive       Boolean        @default(true)
 
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  accountMaster  AccountMaster? @relation(fields: [accountCode], references: [code], onDelete: SetNull)
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([accountCode])
 }
 
