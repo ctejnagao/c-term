@@ -5,7 +5,9 @@ import { PrismaPg } from '@prisma/adapter-pg';
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
-// ㈱コムテックエンタープライズ 弥生会計 勘定科目一覧表 (全8頁・188科目)
+// =============================================================================
+// ㈱コムテックエンタープライズ 弥生会計 勘定科目一覧表（全8ページ・計188科目）
+// =============================================================================
 const accountMastersData = [
   // --- 1頁: 資産 / 流動資産 / 現金・預金 ---
   { code: '101', name: '現 金', category: '資産', subCategory: '現金・預金', taxType: '対象外', taxFraction: '切り捨て', statementItem: '現金', borrowLend: '借方' },
@@ -236,7 +238,9 @@ const accountMastersData = [
   { code: '683', name: '[製] 他 勘 定 振 替', category: '製造原価', subCategory: '仕掛品', taxType: '対象外', taxFraction: '切り捨て', statementItem: '他勘定振替高', borrowLend: '借方' },
 ];
 
-// 弥生正式コードに準拠した初期自動仕訳ルール
+// =============================================================================
+// 弥生正式コード準拠 摘要マッチング・自動仕訳ルール（AccountCodeRule）
+// =============================================================================
 const initialRulesData = [
   { keyword: 'ラクテンカ−ド', accountCode: '314', accountName: '未払金', subAccountCode: '156', subAccountName: '楽天カード', taxType: '課対仕入10%', priority: 100 },
   { keyword: 'エスビ－', accountCode: '550', accountName: '仕入高', subAccountCode: '010', subAccountName: 'SB C&S', taxType: '課対仕入10%', priority: 90 },
@@ -264,7 +268,9 @@ const initialRulesData = [
   { keyword: 'トウカイオ－トメ－シヨン', accountCode: '166', accountName: '売掛金', subAccountCode: '005', subAccountName: '東海オートメーション', taxType: '対象外', priority: 50 },
 ];
 
-// 小口現金用科目マスタ
+// =============================================================================
+// 小口現金出納用科目マスタ（AccountSubject）
+// =============================================================================
 const initialAccountSubjects = [
   { name: '旅費交通費', code: '722', isForCash: true, displayOrder: 10, description: '電車・バス・タクシー・新幹線等' },
   { name: '消耗品費', code: '728', isForCash: true, displayOrder: 20, description: '文具・日用品・小額什器等' },
