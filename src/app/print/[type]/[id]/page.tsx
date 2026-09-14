@@ -10,6 +10,21 @@ export default function PrintPage({ params }: { params: Promise<{ type: string, 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const isPurchaseOrder = resolvedParams.type === 'purchase_order' || resolvedParams.type === 'purchase-order';
+    if (isPurchaseOrder) {
+      fetch(`/api/purchases/${resolvedParams.id}`)
+        .then(res => res.json())
+        .then(item => {
+          setData(item);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error(err);
+          setLoading(false);
+        });
+      return;
+    }
+
     const apiRoute = resolvedParams.type === 'estimate' ? '/api/estimates' 
                    : resolvedParams.type === 'delivery' ? '/api/deliveries'
                    : resolvedParams.type === 'order_accept' ? '/api/order-acceptances'
@@ -21,31 +36,47 @@ export default function PrintPage({ params }: { params: Promise<{ type: string, 
         setLoading(false);
       });
     }
-  }, [params]);
+  }, [params, resolvedParams]);
 
   if (loading) return <div className="p-8 print:hidden">Loading...</div>;
   if (!data) return <div className="p-8 print:hidden">Data not found</div>;
 
+  const isPurchaseOrder = resolvedParams.type === 'purchase_order' || resolvedParams.type === 'purchase-order';
   const isEstimate = resolvedParams.type === 'estimate';
   const isDelivery = resolvedParams.type === 'delivery';
   const isOrderAccept = resolvedParams.type === 'order_accept';
-  
-  const title = isEstimate ? '見　積　書'
+
+  // 和暦変換ヘルパー (例: 令和8年4月28日)
+  const toWareki = (dateStrOrObj: any) => {
+    if (!dateStrOrObj) return '';
+    const d = new Date(dateStrOrObj);
+    if (isNaN(d.getTime())) return '';
+    const year = d.getFullYear();
+    const reiwaYear = year - 2018;
+    const reiwaStr = reiwaYear === 1 ? '元年' : `${reiwaYear}年`;
+    return `令和${reiwaStr}${d.getMonth() + 1}月${d.getDate()}日`;
+  };
+
+  const title = isPurchaseOrder ? '注　文　書'
+              : isEstimate ? '見　積　書'
               : isDelivery ? '納　品　書'
               : isOrderAccept ? '注　文　請　書'
               : resolvedParams.type === 'invoice' ? '請　求　書' : '';
   
-  const docNoLabel = isEstimate ? '見積NO.'
+  const docNoLabel = isPurchaseOrder ? '注文番号'
+                   : isEstimate ? '見積NO.'
                    : isDelivery ? '納品NO.'
                    : isOrderAccept ? '請書NO.'
                    : '請求NO.';
 
-  const docNo = isEstimate ? data.estimateNo
+  const docNo = isPurchaseOrder ? data.orderNo
+              : isEstimate ? data.estimateNo
               : isDelivery ? data.deliveryNo
               : isOrderAccept ? data.acceptanceNo
               : resolvedParams.type === 'invoice' ? data.invoiceNo : '';
 
-  const dateValue = isEstimate ? data.issueDate
+  const dateValue = isPurchaseOrder ? data.orderDate
+                  : isEstimate ? data.issueDate
                   : isDelivery ? data.deliveryDate
                   : isOrderAccept ? data.acceptDate
                   : resolvedParams.type === 'invoice' ? data.issueDate : '';
@@ -53,6 +84,182 @@ export default function PrintPage({ params }: { params: Promise<{ type: string, 
   // 画像は後で差し替えられるようにプレースホルダーを配置
   const logoUrl = '/logo_print.png'; // 印刷用（旧）ロゴ
   const sealUrl = '/seal.png'; // 実際には public/seal.png に配置
+
+  if (isPurchaseOrder) {
+    return (
+      <div className="bg-gray-100 min-h-screen p-8 print:p-0 print:bg-white font-sans text-black">
+        <div className="mb-4 print:hidden text-center">
+          <button onClick={() => window.print()} className="bg-blue-600 text-white px-6 py-2 rounded shadow hover:bg-blue-700">
+            このページを印刷する
+          </button>
+        </div>
+
+        <div className="max-w-[210mm] min-h-[297mm] mx-auto bg-white shadow-lg print:shadow-none print:m-0 print:p-0 p-12 box-border relative text-[13px]">
+          {/* 注文書 タイトル */}
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold tracking-[1.5em] border-b-2 border-black inline-block pb-1 pl-6 font-serif">
+              注　文　書
+            </h1>
+          </div>
+
+          {/* 宛先 & 発行元ヘッダー */}
+          <div className="flex justify-between items-start mb-6">
+            <div className="w-1/2">
+              <h2 className="text-xl font-bold border-b border-black pb-1 mb-2">
+                {data.supplier?.name || '仕入先御中'}　御中
+              </h2>
+              <div className="text-xs text-gray-700 leading-relaxed mt-3 pr-4">
+                下記の通りご注文申し上げますので、その諾否を請書またはその他の方法によりご通知ください。<br />
+                本注文書受領後10日以内に諾否の回答なき場合は承諾したものとします。
+              </div>
+            </div>
+
+            <div className="w-2/5 text-right text-xs">
+              <div className="mb-2">
+                <span className="font-semibold mr-3 text-slate-600">注文番号</span>
+                <span className="font-bold text-sm font-mono border-b border-black pb-0.5">{data.orderNo}</span>
+              </div>
+              <div className="mb-3">
+                <span className="font-semibold mr-3 text-slate-600">注文年月日</span>
+                <span className="font-medium">{toWareki(data.orderDate)}</span>
+              </div>
+              <div className="border border-black p-3 text-left relative bg-white">
+                <p className="text-[10px] text-slate-500 mb-0.5">発注元</p>
+                <p className="font-bold text-sm mb-1">㈱ コムテックエンタープライズ</p>
+                <p>〒460-0002</p>
+                <p>名古屋市中区丸の内２-１０-３０</p>
+                <p>インテリジェント林ビル４F</p>
+                <p className="mt-1">Tel(052)222-8077 Fax(052)222-8078</p>
+                <div className="absolute top-2 right-2 w-14 h-14 opacity-85">
+                  <Image src={sealUrl} alt="社印" fill className="object-contain" unoptimized />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 件名・条件メタ情報テーブル */}
+          <table className="w-full border-collapse border border-black text-xs mb-4">
+            <tbody>
+              <tr>
+                <th className="bg-gray-100 border border-black p-2 w-28 text-left font-semibold">件　名</th>
+                <td className="border border-black p-2 font-medium" colSpan={3}>
+                  {data.content}
+                </td>
+              </tr>
+              <tr>
+                <th className="bg-gray-100 border border-black p-2 text-left font-semibold">見積書番号</th>
+                <td className="border border-black p-2 font-mono font-medium">
+                  {data.supplierEstimateNo || '-'}
+                </td>
+                <th className="bg-gray-100 border border-black p-2 w-32 text-left font-semibold">納入場所／受入部門</th>
+                <td className="border border-black p-2">㈱コムテックエンタープライズ</td>
+              </tr>
+              <tr>
+                <th className="bg-gray-100 border border-black p-2 text-left font-semibold">作業予定期間</th>
+                <td className="border border-black p-2">
+                  {data.deliveryDate ? `${toWareki(data.deliveryDate)} 納期` : '〜'}
+                </td>
+                <th className="bg-gray-100 border border-black p-2 text-left font-semibold">特記事項</th>
+                <td className="border border-black p-2">{data.remarks || '-'}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* 金額合計バナー */}
+          <div className="flex border-2 border-black w-3/5 mb-4">
+            <div className="bg-gray-100 font-bold px-4 py-2 border-r-2 border-black tracking-widest flex items-center justify-center text-xs">
+              合計金額
+            </div>
+            <div className="flex-1 text-2xl font-bold px-4 py-2 text-center flex items-center justify-center">
+              ¥{Number(data.totalAmount).toLocaleString()} － <span className="text-xs ml-2 font-normal">(税込)</span>
+            </div>
+          </div>
+
+          {/* 明細テーブル */}
+          <table className="w-full text-left border-collapse border-2 border-black text-xs">
+            <thead>
+              <tr className="border-b-2 border-black bg-gray-100 font-semibold">
+                <th className="border-r border-black p-2 w-10 text-center">No.</th>
+                <th className="border-r border-black p-2">注文内容</th>
+                <th className="border-r border-black p-2 w-20 text-center">数量</th>
+                <th className="border-r border-black p-2 w-28 text-right">単価</th>
+                <th className="border-r border-black p-2 w-32 text-right">金　額</th>
+                <th className="p-2 w-28 text-center">備　考</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items && data.items.length > 0 ? (
+                data.items.map((item: any, index: number) => (
+                  <tr key={item.id || index} className="border-b border-black h-11">
+                    <td className="border-r border-black p-2 text-center font-mono">{index + 1}</td>
+                    <td className="border-r border-black p-2 font-medium">{item.itemName}</td>
+                    <td className="border-r border-black p-2 text-center">
+                      {Number(item.quantity).toLocaleString()} {item.unit}
+                    </td>
+                    <td className="border-r border-black p-2 text-right font-mono">
+                      ¥{Number(item.unitPrice).toLocaleString()}
+                    </td>
+                    <td className="border-r border-black p-2 text-right font-mono font-medium">
+                      ¥{Number(item.amount).toLocaleString()}
+                    </td>
+                    <td className="p-2 text-center text-gray-500">{item.remarks || ''}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr className="border-b border-black h-11">
+                  <td className="border-r border-black p-2 text-center font-mono">1</td>
+                  <td className="border-r border-black p-2 font-medium">{data.content}</td>
+                  <td className="border-r border-black p-2 text-center">1 式</td>
+                  <td className="border-r border-black p-2 text-right font-mono">
+                    ¥{Number(data.subtotal).toLocaleString()}
+                  </td>
+                  <td className="border-r border-black p-2 text-right font-mono font-medium">
+                    ¥{Number(data.subtotal).toLocaleString()}
+                  </td>
+                  <td className="p-2 text-center text-gray-500">{data.remarks || ''}</td>
+                </tr>
+              )}
+
+              {/* 空行の追加（10行分のスペースを確保） */}
+              {Array.from({ length: Math.max(0, 8 - (data.items?.length || 1)) }).map((_, i) => (
+                <tr key={`empty-${i}`} className="border-b border-black h-11">
+                  <td className="border-r border-black"></td>
+                  <td className="border-r border-black"></td>
+                  <td className="border-r border-black"></td>
+                  <td className="border-r border-black"></td>
+                  <td className="border-r border-black"></td>
+                  <td></td>
+                </tr>
+              ))}
+
+              {/* 小計・消費税・合計 */}
+              <tr className="border-t-2 border-black bg-gray-50">
+                <td colSpan={4} className="border-r border-black p-2 text-center font-bold tracking-widest">小　計</td>
+                <td className="border-r border-black p-2 text-right font-semibold font-mono">
+                  ¥{Number(data.subtotal).toLocaleString()}
+                </td>
+                <td></td>
+              </tr>
+              <tr className="border-t border-black bg-gray-50">
+                <td colSpan={4} className="border-r border-black p-2 text-center font-bold tracking-widest">消費税 (10%)</td>
+                <td className="border-r border-black p-2 text-right font-mono">
+                  ¥{Number(data.tax).toLocaleString()}
+                </td>
+                <td></td>
+              </tr>
+              <tr className="border-t border-black bg-gray-100 font-bold">
+                <td colSpan={4} className="border-r border-black p-2 text-center tracking-widest">合　計</td>
+                <td className="border-r border-black p-2 text-right text-sm font-mono">
+                  ¥{Number(data.totalAmount).toLocaleString()}
+                </td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-100 min-h-screen p-8 print:p-0 print:bg-white font-sans text-black">

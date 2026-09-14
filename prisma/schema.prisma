@@ -128,21 +128,43 @@ model OrderAcceptance {
 
 // 注文書（仕入・外注発注）
 model PurchaseOrder {
-  id           Int       @id @default(autoincrement())
-  orderNo      String    @unique // 注文№
-  projectId    Int
-  project      Project   @relation(fields: [projectId], references: [id])
-  supplierId   Int
-  supplier     Partner   @relation(fields: [supplierId], references: [id])
-  orderDate    DateTime
-  deliveryDate DateTime?
-  paymentDate  DateTime?
-  subtotal     Decimal   @db.Decimal(12, 2)
-  tax          Decimal   @db.Decimal(12, 2)
-  totalAmount  Decimal   @db.Decimal(12, 2)
-  content      String
-  createdAt    DateTime  @default(now())
-  deletedAt    DateTime? // 論理削除
+  id                 Int                 @id @default(autoincrement())
+  orderNo            String              @unique // 注文№ (例: 26-01120)
+  projectId          Int
+  project            Project             @relation(fields: [projectId], references: [id])
+  supplierId         Int
+  supplier           Partner             @relation(fields: [supplierId], references: [id])
+  supplierEstimateNo String?             // 外注先見積書番号 (例: 6398)
+  orderDate          DateTime
+  deliveryDate       DateTime?
+  paymentDate        DateTime?
+  subtotal           Decimal             @db.Decimal(12, 2)
+  tax                Decimal             @db.Decimal(12, 2)
+  totalAmount        Decimal             @db.Decimal(12, 2)
+  content            String              // 件名・注文内容
+  remarks            String?             // 特記事項 (例: 対象：81，82号機)
+  status             String              @default("手配済") // 手配済 / 納品済 / 支払済 / キャンセル
+  isReconciled       Boolean             @default(false) // 支払消込フラグ
+  reconciledAt       DateTime?           // 消込日時
+  items              PurchaseOrderItem[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @default(now()) @updatedAt
+  deletedAt          DateTime?           // 論理削除
+}
+
+model PurchaseOrderItem {
+  id              Int           @id @default(autoincrement())
+  purchaseOrderId Int
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  itemOrder       Int           @default(1)
+  itemName        String        // 注文内容・品名
+  quantity        Decimal       @default(1) @db.Decimal(10, 2)
+  unit            String?       @default("式")
+  unitPrice       Decimal       @db.Decimal(12, 2)
+  amount          Decimal       @db.Decimal(12, 2)
+  remarks         String?       // 備考
+  createdAt       DateTime      @default(now())
+  deletedAt       DateTime?     // 論理削除
 }
 
 // 納品書・分納伝票

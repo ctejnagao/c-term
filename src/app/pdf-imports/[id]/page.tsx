@@ -63,7 +63,17 @@ export default async function PdfImportDetailPage({ params }: { params: Promise<
         </span>
       </div>
 
-      <h1 className="text-2xl font-bold mb-6">取込詳細: {data.fileName}</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <h1 className="text-2xl font-bold">取込詳細: {data.fileName}</h1>
+        {parsedData?.type === 'ORDER' && (
+          <Link
+            href={`/purchases`}
+            className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1.5 self-start"
+          >
+            この受注から仕入先へ発注（買掛登録）
+          </Link>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div>

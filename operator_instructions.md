@@ -1,16 +1,12 @@
-# タスク指示書: 銀行残高照会・買掛管理画面および取込APIの実装（Local開発環境）
+見積で仕入（機器や外注）が必要な場合、仕入先から見積（PDF）を取得
+受注したら仕入先へ発注（注文書印刷）買掛ステータスは手配済
+納品検収後、外注振込で支払消込
 
-## 1. 前提状況
-- DBにはすでに弥生会計の勘定科目マスタ (`AccountMaster`) および推論ルール (`AccountCodeRule`) が登録済みです。
-- 先ほど `npx prisma db seed` 実行時に `prisma.config.ts` 側の設定不足エラーが発生したため、今後のサーバー反映に備えて設定を整えておいてください。
+機能
+1.受注でPDF取り込み、見積No紐付きで発注（どの受注分か）
+2.買掛メニュより仕入先発注（採番は26-01120より）発注書印刷（PDF参照）
+3.UFJ銀行入出金明細で該当支払を消し込む）次STEPで実装：今回は手動で消込FLAG更新
 
----
-
-## 2. 実施タスク
-
-### タスク1: `prisma.config.ts` のシード設定修正
-CTEJ-Serverでも `npx prisma db seed` がそのまま通るよう、プロジェクト直下の `prisma.config.ts` の `migrations` ブロックにシードコマンドを追加してください。
-```typescript
-migrations: {
-  seed: 'npx tsx ./prisma/seed.ts',
-},
+参照外注見積書及び発注書
+C:\AGI\Ctej\c-terp\資料\御見積書COM6398.pdf
+C:\AGI\Ctej\c-terp\資料\注文書(24-01116).pdf

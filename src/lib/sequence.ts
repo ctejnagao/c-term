@@ -16,13 +16,55 @@ export function getFiscalYearPrefix(date: Date = new Date()): string {
   return (fiscalYear % 100).toString().padStart(2, '0');
 }
 
-export type SequenceType = 'ESTIMATE' | 'DELIVERY' | 'INVOICE' | 'PROJECT' | 'ORDER_ACCEPT';
+export type SequenceType = 'ESTIMATE' | 'DELIVERY' | 'INVOICE' | 'PROJECT' | 'ORDER_ACCEPT' | 'PURCHASE_ORDER';
+
+/**
+ * 発注書（注文書）用の自動採番を行う。
+ * 採番ルール: 年度(2桁) + "-" + 5桁連番（例: 26-01120より採番）
+ */
+export async function generatePurchaseOrderSequence(date: Date = new Date()): Promise<string> {
+  const yearPrefix = getFiscalYearPrefix(date);
+  const type: SequenceType = 'PURCHASE_ORDER';
+
+  const result = await prisma.$transaction(async (tx) => {
+    let tracker = await tx.sequenceTracker.findUnique({
+      where: { key: type }
+    });
+
+    if (!tracker) {
+      // 未存在の場合は初期連番1119で作成し、今回発行で1120にする
+      tracker = await tx.sequenceTracker.create({
+        data: {
+          key: type,
+          yearPrefix,
+          currentSeq: 1120,
+        }
+      });
+    } else {
+      tracker = await tx.sequenceTracker.update({
+        where: { key: type },
+        data: {
+          yearPrefix,
+          currentSeq: { increment: 1 }
+        }
+      });
+    }
+    return tracker;
+  });
+
+  const seqNumberString = result.currentSeq.toString().padStart(5, '0');
+  return `${yearPrefix}-${seqNumberString}`;
+}
 
 /**
  * 指定されたタイプ（ESTIMATE等）と日付に基づき、自動採番を行う。
  * 例: 2600001
  */
 export async function generateNextSequence(type: SequenceType, date: Date = new Date()): Promise<string> {
+  if (type === 'PURCHASE_ORDER') {
+    return generatePurchaseOrderSequence(date);
+  }
+
   const yearPrefix = getFiscalYearPrefix(date);
   
   // トランザクションで安全に採番・インクリメントする
