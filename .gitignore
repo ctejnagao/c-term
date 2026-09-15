@@ -46,3 +46,6 @@ next-env.d.ts
 dev-db-data/
 pgadmin-data/
 *.log
+
+scripts/clear_consigned_inventory.js
+scripts/run_deploy_step.bat
