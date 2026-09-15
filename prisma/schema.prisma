@@ -28,6 +28,7 @@ model Partner {
   purchaseOrders PurchaseOrder[]
   orders         Order[]
   contracts      RecurringContract[]
+  consignedInventories ConsignedInventory[]
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   deletedAt      DateTime? // 論理削除
@@ -572,5 +573,63 @@ model AccountCodeRule {
   updatedAt      DateTime       @updatedAt
 
   @@index([accountCode])
+}
+
+// -------------------------------------------------------------
+// 8. 日本カラリング（JCC）特化型・預託バックアップPC在庫管理
+// -------------------------------------------------------------
+model ConsignedInventory {
+  id           Int                     @id @default(autoincrement())
+  itemCode     String?                 @unique // 管理番号 (例: "JCC-PC-001")
+  partnerId    Int?                    // 委託元 (デフォルト: 日本カラリング)
+  partner      Partner?                @relation(fields: [partnerId], references: [id])
+  
+  itemName     String                  // 機器・品名 (例: "Dell OptiPlex 7090")
+  serialNumber String?                 // シリアル番号 / 個体管理
+  os           String?                 // OS (例: "Windows 11 Pro 64bit")
+  spec         String?                 // CPU / メモリ / SSD / 仕様詳細
+  
+  purchaseDate DateTime?               // 購入日
+  inboundDate  DateTime?               // 在庫日・受託日
+  
+  location     String                  @default("弊社") // "弊社" | "光システム" | "JCC様先" | "その他"
+  
+  initialQty   Int                     @default(1) // 受託時総台数
+  currentQty   Int                     @default(1) // 現在庫台数
+  shippedQty   Int                     @default(0) // 出庫累計台数
+  
+  status       String                  @default("STORED") // "STORED"(保管中), "PARTIALLY_DELIVERED"(一部出庫), "DEPLETED"(出庫完了), "DISPOSED"(返却・廃棄)
+  remarks      String?                 // 備考・特記事項
+  
+  logs         ConsignedInventoryLog[] // 出庫・移動履歴
+  
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  deletedAt    DateTime?
+
+  @@index([location])
+  @@index([status])
+}
+
+// 出庫・移動・受託履歴ログ
+model ConsignedInventoryLog {
+  id           Int                @id @default(autoincrement())
+  inventoryId  Int
+  inventory    ConsignedInventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  
+  actionType   String             @default("OUTBOUND") // "INBOUND"(受託入庫), "OUTBOUND"(出庫), "TRANSFER"(拠点間移動)
+  quantity     Int                // 出庫・移動台数
+  date         DateTime           @default(now()) // 発生日
+  
+  fromLocation String?            // 移動元 (弊社 / 光システム)
+  toLocation   String?            // 移動先・納品先 (例: JCC第1工場)
+  purpose      String?            // 目的 (例: 障害代替、定期入替)
+  handler      String?            // 担当者
+  remarks      String?            // 備考
+  
+  createdAt    DateTime           @default(now())
+
+  @@index([inventoryId])
+  @@index([date])
 }
 

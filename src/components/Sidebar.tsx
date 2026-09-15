@@ -55,6 +55,7 @@ const MENU_SECTIONS: MenuSection[] = [
     icon: CreditCard,
     items: [
       { label: "受注・分納管理", href: "/orders", color: "text-teal-300" },
+      { label: "JCC預託PC在庫", href: "/inventory", color: "text-purple-300 font-medium" },
       { label: "発注・支払管理", href: "/purchases" },
       { label: "PDF自動取込", href: "/pdf-imports", color: "text-yellow-300" },
     ],
