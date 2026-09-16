@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Download, RefreshCw, Calculator, Calendar } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Download, RefreshCw, Calculator, Calendar, Upload, CheckCircle2, Pencil } from 'lucide-react';
+import ExpenseExcelImportModal, { ParseResult } from '@/components/ExpenseExcelImportModal';
+import CashTransactionEditModal from '@/components/CashTransactionEditModal';
 
 type Transaction = {
   id: number;
@@ -24,11 +26,21 @@ export default function CashTransactionsPage() {
   
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [carryOverAmount, setCarryOverAmount] = useState<number>(0);
+  const [isAutoCarryOver, setIsAutoCarryOver] = useState<boolean>(false);
+  const [isFiscalStart, setIsFiscalStart] = useState<boolean>(false);
   
   const [employees, setEmployees] = useState<{id: number, name: string}[]>([]);
   const [projects, setProjects] = useState<{id: number, name: string}[]>([]);
   const [accountSubjects, setAccountSubjects] = useState<{id: number, name: string}[]>([]);
   
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importPreviewData, setImportPreviewData] = useState<ParseResult | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [notification, setNotification] = useState<string | null>(null);
+
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+
   const [formData, setFormData] = useState({
     transactionDate: '',
     type: 'OUT',
@@ -96,6 +108,8 @@ export default function CashTransactionsPage() {
       setTransactions(await txRes.json());
       const balData = await balRes.json();
       setCarryOverAmount(balData.carryOverAmount || 0);
+      setIsAutoCarryOver(!!balData.isAuto);
+      setIsFiscalStart(!!balData.isFiscalStart || month.endsWith('-07'));
     } catch (err) {
       console.error(err);
     } finally {
@@ -118,8 +132,22 @@ export default function CashTransactionsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ yearMonth, carryOverAmount: val }),
       });
+      setIsAutoCarryOver(false);
     } catch (err) {
       console.error('Failed to update balance', err);
+    }
+  };
+
+  const handleRecalculateCarryOver = async () => {
+    try {
+      const res = await fetch(`/api/cash-balances?yearMonth=${yearMonth}&recalculate=true`);
+      const balData = await res.json();
+      setCarryOverAmount(balData.carryOverAmount || 0);
+      setIsAutoCarryOver(true);
+      setNotification('前月の最終実績残高から繰越額を自動再計算しました。');
+      setTimeout(() => setNotification(null), 4000);
+    } catch (err) {
+      console.error('Failed to recalculate balance', err);
     }
   };
 
@@ -155,6 +183,62 @@ export default function CashTransactionsPage() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleTransactionUpdated = (updated: Transaction) => {
+    setTransactions(prev => prev.map(t => (t.id === updated.id ? updated : t)));
+    setNotification('出納データを更新しました。');
+    setTimeout(() => setNotification(null), 4000);
+    fetchData(yearMonth);
+  };
+
+  const handleTransactionDeleted = (deletedId: number) => {
+    setTransactions(prev => prev.filter(t => t.id !== deletedId));
+    setNotification('出納データを削除しました。');
+    setTimeout(() => setNotification(null), 4000);
+    fetchData(yearMonth);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/cash-transactions/parse-excel', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || 'Excelファイルの解析に失敗しました。');
+      }
+
+      setImportPreviewData(json);
+      setIsImportModalOpen(true);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Excel取込処理でエラーが発生しました。');
+    } finally {
+      setUploadingFile(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleImportSuccess = (count: number, targetMonth: string) => {
+    setNotification(`${count}件の交通費精算データを取り込みました。`);
+    setTimeout(() => setNotification(null), 5000);
+    if (targetMonth && targetMonth !== yearMonth) {
+      setYearMonth(targetMonth);
+    } else {
+      fetchData(yearMonth);
     }
   };
 
@@ -203,7 +287,7 @@ export default function CashTransactionsPage() {
           </div>
           <h1 className="text-2xl font-bold text-gray-800">社員現金出納管理</h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 bg-white px-4 py-2 border rounded-lg shadow-sm">
             <Calendar size={18} className="text-gray-500" />
             <input 
@@ -213,9 +297,28 @@ export default function CashTransactionsPage() {
               className="outline-none text-gray-700 font-medium"
             />
           </div>
+
+          {/* Excel Import Button */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".xlsx,.xls"
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingFile}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm cursor-pointer"
+            title="社員提出の交通費等請求明細書(Excel)から出金データを自動取込"
+          >
+            <Upload size={18} />
+            {uploadingFile ? '解析中...' : '交通費Excel取込'}
+          </button>
+
           <button 
             onClick={exportCSV}
-            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer"
           >
             <Download size={18} />
             会計CSV出力
@@ -223,19 +326,78 @@ export default function CashTransactionsPage() {
         </div>
       </div>
 
+      {/* Success Notification Banner */}
+      {notification && (
+        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-emerald-800 text-sm animate-in fade-in slide-in-from-top-2 duration-200 shadow-xs">
+          <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
+          <span className="font-semibold">{notification}</span>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl border shadow-sm flex flex-col justify-between">
-          <span className="text-gray-500 text-sm font-medium">前月繰越額</span>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 text-sm font-medium">前月繰越額</span>
+            <div className="flex items-center gap-1.5">
+              {isFiscalStart ? (
+                <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">
+                  期首月 (手入力)
+                </span>
+              ) : isAutoCarryOver ? (
+                <>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
+                    自動引継
+                  </span>
+                  <button 
+                    type="button"
+                    onClick={handleRecalculateCarryOver}
+                    className="text-gray-400 hover:text-emerald-600 p-1 rounded hover:bg-gray-100 transition-colors cursor-pointer"
+                    title="前月末残高から自動再計算"
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">
+                    手動設定中
+                  </span>
+                  <button 
+                    type="button"
+                    onClick={handleRecalculateCarryOver}
+                    className="text-gray-400 hover:text-emerald-600 p-1 rounded hover:bg-gray-100 transition-colors cursor-pointer"
+                    title="前月末残高から自動再計算に戻す"
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
           <div className="mt-2 flex items-center">
             <span className="text-xl font-bold text-gray-800 mr-1">¥</span>
             <input 
               type="number"
               value={carryOverAmount}
-              onChange={e => setCarryOverAmount(Number(e.target.value))}
+              onChange={e => {
+                setCarryOverAmount(Number(e.target.value));
+                setIsAutoCarryOver(false);
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+              }}
               onBlur={handleCarryOverChange}
               className="text-2xl font-bold text-gray-800 w-full outline-none border-b focus:border-blue-500 bg-transparent"
+              title={isFiscalStart ? "期首残高を入力してください。Enterまたは枠外クリックで保存されます。" : "Enterまたは枠外クリックで保存されます。手動修正も可能です。"}
             />
+          </div>
+          <div className="text-[11px] text-gray-400 mt-1">
+            {isFiscalStart
+              ? '※7月は期首のため手入力設定となります'
+              : isAutoCarryOver
+              ? '※前月末残高を自動反映中'
+              : '※手動設定中 (↻で自動計算に戻せます)'}
           </div>
         </div>
         <div className="bg-white p-6 rounded-xl border shadow-sm flex flex-col justify-between">
@@ -368,9 +530,13 @@ export default function CashTransactionsPage() {
                       <div>{t.accountSubject}</div>
                       <div className="text-gray-400">{t.taxCategory}</div>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <button onClick={() => handleDelete(t.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="削除">
-                        <Trash2 size={16} />
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                      <button
+                        onClick={() => setEditingTx(t)}
+                        className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors cursor-pointer"
+                        title="編集・削除"
+                      >
+                        <Pencil size={16} />
                       </button>
                     </td>
                   </tr>
@@ -380,6 +546,30 @@ export default function CashTransactionsPage() {
           </table>
         </div>
       </div>
+
+      {/* Excel Import Modal */}
+      <ExpenseExcelImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        data={importPreviewData}
+        employees={employees}
+        projects={projects}
+        accountSubjects={accountSubjects}
+        onSuccess={handleImportSuccess}
+      />
+
+      {/* Transaction Edit & Delete Modal */}
+      <CashTransactionEditModal
+        isOpen={!!editingTx}
+        onClose={() => setEditingTx(null)}
+        transaction={editingTx}
+        employees={employees}
+        projects={projects}
+        accountSubjects={accountSubjects}
+        onUpdated={handleTransactionUpdated}
+        onDeleted={handleTransactionDeleted}
+      />
     </div>
   );
 }
+
